@@ -6,6 +6,7 @@ const FILTERS = [
   ['all', 'All books'],
   ['avail', 'Available to borrow'],
   ['loved', 'Friends loved'],
+  ['reading', "I'm reading"],
   ['want', 'My want-to-read'],
   ['inline', "I'm in line"],
   ['withme', 'Borrowed by me'],
@@ -122,7 +123,7 @@ export default function Library({ group, groups, profile, notice, clearNotice, o
     setMark: (bookId, status) => {
       if (status === 'none') return run(supabase.from('reading').delete().eq('user_id', me).eq('book_id', bookId))
       const row = { user_id: me, book_id: bookId, status, updated_at: new Date().toISOString() }
-      if (status === 'want') row.rating = null
+      if (status !== 'read') row.rating = null
       return run(supabase.from('reading').upsert(row))
     },
     setRating: (bookId, rating) =>
@@ -135,6 +136,7 @@ export default function Library({ group, groups, profile, notice, clearNotice, o
     all: () => true,
     avail: (b) => b.copies.some((c) => c.status === 'home' && c.lendable && c.owner_id !== me),
     loved: (b) => b.reading.some((r) => r.rating === 'up'),
+    reading: (b) => myMark(b) === 'reading',
     want: (b) => myMark(b) === 'want',
     inline: (b) => b.copies.some((c) => c.queue.some((q) => q.user_id === me)),
     withme: (b) => b.copies.some((c) => c.lent_to_user === me),
@@ -291,6 +293,7 @@ function AddBook({ onAdd }) {
 function BookCard({ book, me, members, nameOf, actions }) {
   const who = (pred) => book.reading.filter(pred).map((r) => r.user_id)
   const wanters = who((r) => r.status === 'want')
+  const readingNow = who((r) => r.status === 'reading')
   const loved = who((r) => r.rating === 'up')
   const fine = who((r) => r.rating === 'meh')
   const notFor = who((r) => r.rating === 'down')
@@ -308,12 +311,13 @@ function BookCard({ book, me, members, nameOf, actions }) {
         {book.author && <p className="author">{book.author}</p>}
       </div>
 
-      {(loved.length > 0 || fine.length > 0 || notFor.length > 0 || readNoVerdict.length > 0 || wanters.length > 0) && (
+      {(loved.length > 0 || fine.length > 0 || notFor.length > 0 || readNoVerdict.length > 0 || readingNow.length > 0 || wanters.length > 0) && (
         <div className="verdicts">
           {loved.length > 0 && <span className="v up">Loved by <b>{names(loved)}</b></span>}
           {fine.length > 0 && <span className="v meh">Fine for <b>{names(fine)}</b></span>}
           {notFor.length > 0 && <span className="v down">Not for <b>{names(notFor)}</b></span>}
           {readNoVerdict.length > 0 && <span className="v">Read by <b>{names(readNoVerdict)}</b></span>}
+          {readingNow.length > 0 && <span className="v">Reading now: <b>{names(readingNow)}</b></span>}
           {wanters.length > 0 && <span className="v">Wants to read: <b>{names(wanters)}</b></span>}
         </div>
       )}
@@ -326,7 +330,7 @@ function BookCard({ book, me, members, nameOf, actions }) {
 
       <div className="mine-row">
         <div className="segmented" role="group" aria-label="Your status for this book">
-          {[['read', 'Read'], ['want', 'Want to read'], ['none', 'Neither']].map(([v, label]) => (
+          {[['want', 'Want to read'], ['reading', 'Reading'], ['read', 'Read'], ['none', 'Neither']].map(([v, label]) => (
             <button key={v} type="button" aria-pressed={mine === v} onClick={() => mine !== v && actions.setMark(book.id, v)}>{label}</button>
           ))}
         </div>
