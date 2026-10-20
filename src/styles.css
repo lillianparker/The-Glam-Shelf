@@ -1,4 +1,4 @@
-/* The Glam Shelf â€” one reading column: wordmark and circle up top, a big catalog search,
+/* The Glam Shelf — one reading column: wordmark and circle up top, a big catalog search,
    then one card per title listing every friend's copy. Berry ink + champagne gold. */
 :root {
   --bg: #fbf5f6;
@@ -311,7 +311,7 @@ details.add summary::-webkit-details-marker { display: none; }
   @keyframes rise { from { opacity: 0; transform: translate(-50%, 8px); } }
 }
 
-/* member chips â†’ each person's shelf */
+/* member chips → each person's shelf */
 .members { list-style: none; margin: 0; padding: 0; flex-basis: 100%; display: flex; flex-wrap: wrap; gap: 6px; }
 .members button {
   background: var(--surface); border: 1px solid var(--line); border-radius: 999px;
@@ -338,3 +338,25 @@ details.add summary::-webkit-details-marker { display: none; }
 .history-list { list-style: none; margin: 0; padding: 0 0 0 10px; border-left: 2px solid var(--line); display: flex; flex-direction: column; gap: 3px; font-size: 13px; }
 .history-list li { display: flex; flex-wrap: wrap; gap: 4px 10px; }
 .history-list b { font-weight: 600; }
+
+/* scores */
+.members .pts {
+  margin-left: 7px; font: 500 11px var(--f-mono); font-variant-numeric: tabular-nums;
+  color: var(--gold); background: var(--gold-soft); border-radius: 999px; padding: 1px 6px;
+}
+.members button[aria-pressed="true"] .pts { background: color-mix(in srgb, var(--accent-ink) 22%, transparent); color: var(--accent-ink); }
+.scoreline { margin: 0; display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 13px; color: var(--muted); }
+.scoreline b { color: var(--gold); font-weight: 600; }
+
+/* edit your copy */
+.edit-form { flex-basis: 100%; display: grid; grid-template-columns: 1fr 1fr auto; gap: 8px; align-items: end; }
+.edit-actions { display: flex; gap: 6px; }
+@media (max-width: 580px) { .edit-form { grid-template-columns: 1fr; } }
+
+/* sign-in screen */
+.segmented.tabs { align-self: stretch; }
+.segmented.tabs button { flex: 1; padding: 8px 12px; font-size: 14px; }
+.segmented button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); }
+.login-links { display: flex; flex-wrap: wrap; gap: 6px 16px; }
+.account { flex-wrap: wrap; }
+.account.inline input[type="password"] { width: 220px; }
