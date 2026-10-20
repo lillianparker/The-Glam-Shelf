@@ -16,6 +16,14 @@ export const AVATARS = [
   { id: 'mug', label: 'Tulip mug' },
   { id: 'globe', label: 'Globe' },
   { id: 'clock', label: 'Alarm clock' },
+  { id: 'lavender-vase', label: 'Lavender vase' },
+  { id: 'lavender-bottle', label: 'Lavender bottle' },
+  { id: 'lilies', label: 'Lilies' },
+  { id: 'jar-candle', label: 'Jar candle' },
+  { id: 'candles', label: 'Dripping candles' },
+  { id: 'green-mug', label: 'Green mug' },
+  { id: 'rock', label: 'Rock' },
+  { id: 'liberty', label: 'Statue of Liberty' },
 ]
 
 const byId = Object.fromEntries(AVATARS.map((a) => [a.id, a]))
