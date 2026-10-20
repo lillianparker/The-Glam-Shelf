@@ -695,6 +695,8 @@ svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width:
 .avatar-badge.md { width: 38px; height: 38px; font-size: 15px; }
 .avatar-badge.lg { width: 60px; height: 60px; font-size: 22px; border-color: var(--outline); background: var(--surface); }
 .avatar-badge.none { background: var(--accent-soft); color: var(--accent); border-color: transparent; }
+.avatar-badge { ...; position: relative; }
+.avatar-badge img { position: absolute; inset: 16%; width: 68%; height: 68%; object-fit: contain; }
 .members button { display: inline-flex; align-items: center; gap: 7px; padding-left: 4px; }
 .members .avatar-badge { margin-right: 0; }
 .avatar-button { background: none; border: 0; padding: 0; border-radius: 50%; cursor: pointer; display: grid; }
