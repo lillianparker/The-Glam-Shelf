@@ -5,7 +5,7 @@ import Bookcase from './Bookcase.jsx'
 import BookListing from './BookListing.jsx'
 import LibraryCard from './LibraryCard.jsx'
 import AvatarPicker, { AvatarBadge } from './AvatarPicker.jsx'
-import { scoreMembers, shelfCopies } from './shelf.js'
+import { bookcaseTones, scoreMembers, shelfCopies } from './shelf.js'
 import { AddBook, CopyRow, Empty, ReadingControls, ScoreLine, Verdicts, isStarred, joinNames } from './parts.jsx'
 
 export { POINTS } from './shelf.js'
@@ -210,6 +210,7 @@ export default function Library({ group, groups, profile, notice, clearNotice, o
     .filter(person ? personTests[personTab] : tests[filter])
     .filter((b) => !q || `${b.title} ${b.author}`.toLowerCase().includes(q))
   const scores = useMemo(() => scoreMembers(books || [], members), [books, members])
+  const tones = useMemo(() => bookcaseTones(books || []), [books])
 
   // ----- bookcase selection -----
   const findEntry = (id) => {
@@ -336,6 +337,7 @@ export default function Library({ group, groups, profile, notice, clearNotice, o
                 key={entry?.copy.id || 'none'}
                 ref={listingHeadingRef}
                 entry={entry}
+                tone={tones[entry?.copy.id]}
                 me={me}
                 myName={profile.display_name}
                 members={members}
@@ -608,4 +610,3 @@ function AccountMenu({ profile, onProfileChange, showToast }) {
     </div>
   )
 }
-
