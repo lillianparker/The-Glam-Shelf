@@ -438,13 +438,13 @@ svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width:
 .icon-button:hover { border-color: var(--accent); color: var(--accent); }
 
 /* ---------- intro ---------- */
-.intro { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px 32px; padding-block: 20px 4px; }
+.intro { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px 32px; padding-block: 00px 4px; }
 .intro h1 {
   font: 600 clamp(42px, 6vw, 72px)/0.98 var(--f-display); letter-spacing: -0.03em;
   margin: 0; max-width: 680px; text-wrap: balance;
 }
 .intro h1 em { color: var(--accent); }
-.intro p { color: var(--muted); font-size: 16px; line-height: 1.65; max-width: 560px; margin: 20px 0 0; }
+.intro p { color: var(--muted); font-size: 16px; line-height: 1.65; max-width: 560px; margin: 0; }
 .btn.primary {
   display: inline-flex; align-items: center; gap: 8px; min-height: 46px; padding: 0 22px;
   background: var(--ink); border-color: var(--ink); color: var(--bg); font-weight: 700;
