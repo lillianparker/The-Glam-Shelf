@@ -30,6 +30,10 @@
   --sp-sage: #9db590;
   --sp-blue: #8eaabb;
   --sp-plum: #86607a;
+  --sp-navy: #2f4a66;       /* dark blue */
+  --sp-forest: #34523d;     /* dark green */
+  --sp-aubergine: #4b3460;  /* dark purple */
+  --sp-cocoa: #5b3d2a;      /* dark brown */
   --sp-ink: #2a1a20;
   --sp-paper: #fbf3e6;
 
@@ -545,6 +549,10 @@ svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width:
 .tone-sage  { background: var(--sp-sage);  color: var(--sp-ink); }
 .tone-blue  { background: var(--sp-blue);  color: var(--sp-ink); }
 .tone-plum  { background: var(--sp-plum);  color: var(--sp-paper); }
+.tone-navy      { background: var(--sp-navy);      color: var(--sp-paper); }
+.tone-forest    { background: var(--sp-forest);    color: var(--sp-paper); }
+.tone-aubergine { background: var(--sp-aubergine); color: var(--sp-paper); }
+.tone-cocoa     { background: var(--sp-cocoa);     color: var(--sp-paper); }
 
 /* ---------- listing + library card ---------- */
 .content-grid { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(270px, 0.7fr); gap: 24px; align-items: start; }
