@@ -39,10 +39,14 @@ function Main() {
   const [groupId, setGroupId] = useState(recall(GROUP_KEY))
   const [pendingJoin] = useState(capturePendingJoin)
   const [notice, setNotice] = useState('')
+  const [recovering, setRecovering] = useState(false)
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => setSession(data.session))
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, s) => setSession(s))
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, s) => {
+      if (event === 'PASSWORD_RECOVERY') setRecovering(true)
+      setSession(s)
+    })
     return () => subscription.unsubscribe()
   }, [])
 
@@ -79,6 +83,7 @@ function Main() {
 
   if (session === undefined) return <Splash />
   if (!session) return <Login inviting={Boolean(pendingJoin)} />
+  if (recovering) return <NewPassword onDone={() => { setRecovering(false); setNotice('Password saved') }} />
   if (profile === undefined) return <Splash />
   if (profile === null) return <NameSetup userId={userId} email={session.user.email} onDone={setProfile} />
   if (groups === undefined) return <Splash />
@@ -131,47 +136,146 @@ function SetupNeeded() {
   )
 }
 
+const redirectTo = () => window.location.origin + window.location.pathname
+
 function Login({ inviting }) {
+  // signin | signup | forgot | link
+  const [mode, setMode] = useState('signin')
   const [email, setEmail] = useState('')
-  const [sending, setSending] = useState(false)
-  const [sentTo, setSentTo] = useState('')
+  const [password, setPassword] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [sent, setSent] = useState(null) // { title, body }
   const [error, setError] = useState('')
+
+  function switchTo(m) { setMode(m); setError(''); setSent(null) }
 
   async function submit(e) {
     e.preventDefault()
-    setSending(true); setError('')
-    const { error } = await supabase.auth.signInWithOtp({
-      email: email.trim(),
-      options: { emailRedirectTo: window.location.origin + window.location.pathname },
-    })
-    setSending(false)
-    if (error) setError(friendlyError(error))
-    else setSentTo(email.trim())
+    setBusy(true); setError('')
+    const addr = email.trim()
+    try {
+      if (mode === 'signin') {
+        const { error } = await supabase.auth.signInWithPassword({ email: addr, password })
+        if (error) {
+          setError(/invalid login/i.test(error.message)
+            ? "Wrong email or password. If you've only ever signed in with email links, use “Email me a link” once, then set a password from the menu by your name."
+            : /not confirmed/i.test(error.message)
+              ? 'Confirm your email first: open the link we sent when you created your account.'
+              : friendlyError(error))
+        }
+      } else if (mode === 'signup') {
+        const { data, error } = await supabase.auth.signUp({ email: addr, password, options: { emailRedirectTo: redirectTo() } })
+        if (error) setError(friendlyError(error))
+        else if (data.user && data.user.identities && data.user.identities.length === 0) {
+          setError('That email already has an account. Sign in instead, or use “Forgot password?” to set one.')
+        } else if (!data.session) {
+          setSent({ title: 'Confirm your email', body: <>We sent a link to <strong>{addr}</strong>. Open it once to confirm your account. After that you'll sign in with your password.</> })
+        }
+      } else if (mode === 'forgot') {
+        const { error } = await supabase.auth.resetPasswordForEmail(addr, { redirectTo: redirectTo() })
+        if (error) setError(friendlyError(error))
+        else setSent({ title: 'Check your email', body: <>We sent a link to <strong>{addr}</strong>. Open it on this device to choose a new password.</> })
+      } else {
+        const { error } = await supabase.auth.signInWithOtp({ email: addr, options: { emailRedirectTo: redirectTo() } })
+        if (error) setError(friendlyError(error))
+        else setSent({ title: 'Check your email', body: <>We sent a sign-in link to <strong>{addr}</strong>. Open it on this device and you'll land back here, signed in.</> })
+      }
+    } finally {
+      setBusy(false)
+    }
   }
+
+  const needsPassword = mode === 'signin' || mode === 'signup'
+  const buttonLabel = {
+    signin: busy ? 'Signing in…' : 'Sign in',
+    signup: busy ? 'Creating…' : 'Create account',
+    forgot: busy ? 'Sending…' : 'Email me a reset link',
+    link: busy ? 'Sending…' : 'Email me a sign-in link',
+  }[mode]
 
   return (
     <div className="center-page">
       <div className="panel">
         <Brand />
         <p className="tagline">{TAGLINE}</p>
-        {inviting && <p className="pill-note">You've been invited to a friend's library. Sign in to join.</p>}
-        {sentTo ? (
+        {inviting && <p className="pill-note">You've been invited to a friend's library. Sign in or create an account to join.</p>}
+
+        {sent ? (
           <div className="sent">
-            <h2>Check your email</h2>
-            <p>We sent a sign-in link to <strong>{sentTo}</strong>. Open it on this device and you'll land back here, signed in.</p>
-            <button className="btn ghost" onClick={() => setSentTo('')}>Use a different email</button>
+            <h2>{sent.title}</h2>
+            <p>{sent.body}</p>
+            <button className="btn ghost" onClick={() => switchTo('signin')}>Back to sign in</button>
           </div>
         ) : (
-          <form onSubmit={submit} className="stack">
-            <label className="field">
-              <span>Email</span>
-              <input id="login-email" type="email" required autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" />
-            </label>
-            <button className="btn" disabled={sending}>{sending ? 'Sending…' : 'Email me a sign-in link'}</button>
-            {error && <p className="error">{error}</p>}
-            <p className="muted small">No password. We email you a link each time you sign in.</p>
-          </form>
+          <>
+            {(mode === 'signin' || mode === 'signup') && (
+              <div className="segmented tabs" role="tablist" aria-label="Sign in or create an account">
+                <button type="button" role="tab" aria-selected={mode === 'signin'} aria-pressed={mode === 'signin'} onClick={() => switchTo('signin')}>Sign in</button>
+                <button type="button" role="tab" aria-selected={mode === 'signup'} aria-pressed={mode === 'signup'} onClick={() => switchTo('signup')}>Create account</button>
+              </div>
+            )}
+            {mode === 'forgot' && <h2>Reset your password</h2>}
+            {mode === 'link' && <h2>Sign in with an email link</h2>}
+
+            <form onSubmit={submit} className="stack">
+              <label className="field">
+                <span>Email</span>
+                <input id="login-email" type="email" required autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" />
+              </label>
+              {needsPassword && (
+                <label className="field">
+                  <span>Password</span>
+                  <input id="login-password" type="password" required minLength={mode === 'signup' ? 8 : undefined}
+                    autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
+                    value={password} onChange={(e) => setPassword(e.target.value)} />
+                </label>
+              )}
+              {mode === 'signup' && <p className="muted small">At least 8 characters.</p>}
+              <button className="btn" disabled={busy}>{buttonLabel}</button>
+              {error && <p className="error">{error}</p>}
+            </form>
+
+            <div className="login-links">
+              {mode === 'signin' && <button type="button" className="linkish small" onClick={() => switchTo('forgot')}>Forgot password?</button>}
+              {mode !== 'link' && <button type="button" className="linkish small muted" onClick={() => switchTo('link')}>Email me a link instead</button>}
+              {(mode === 'forgot' || mode === 'link') && <button type="button" className="linkish small" onClick={() => switchTo('signin')}>Back to sign in</button>}
+            </div>
+          </>
         )}
+      </div>
+    </div>
+  )
+}
+
+// Shown after opening a "reset password" email.
+function NewPassword({ onDone }) {
+  const [password, setPassword] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+
+  async function submit(e) {
+    e.preventDefault()
+    setBusy(true); setError('')
+    const { error } = await supabase.auth.updateUser({ password })
+    setBusy(false)
+    if (error) setError(friendlyError(error))
+    else onDone()
+  }
+
+  return (
+    <div className="center-page">
+      <div className="panel">
+        <Brand />
+        <h2>Choose a new password</h2>
+        <form onSubmit={submit} className="stack">
+          <label className="field">
+            <span>New password</span>
+            <input id="new-password" type="password" required minLength={8} autoComplete="new-password" autoFocus value={password} onChange={(e) => setPassword(e.target.value)} />
+          </label>
+          <p className="muted small">At least 8 characters.</p>
+          <button className="btn" disabled={busy}>{busy ? 'Saving…' : 'Save password'}</button>
+          {error && <p className="error">{error}</p>}
+        </form>
       </div>
     </div>
   )
