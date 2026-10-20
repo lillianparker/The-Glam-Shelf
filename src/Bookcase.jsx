@@ -1,234 +1,230 @@
-// The listing that opens when you pick a spine: one physical copy, in detail.
-import { forwardRef, useCallback, useEffect, useRef, useState } from 'react'
-import { supabase, friendlyError } from './supabase.js'
-import { CopyRow, ReadingControls, Verdicts, fmtDate, isStarred } from './parts.jsx'
-import { availabilityText, libraryLog, possessive, spineTone } from './shelf.js'
+// The homepage bookcase: one shelf row per member, each copy a spine.
+import { useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { ShelfObject } from './AvatarPicker.jsx'
+import { findAvatar } from './avatars.js'
+import { availabilityText, bookcaseTones, chunkRows, fitCount, possessive, shelfCopies, spineHeight, spineTone } from './shelf.js'
 
-const BookListing = forwardRef(function BookListing({ entry, tone, me, myName, members, nameOf, actions, showToast, onAddBook }, headingRef) {
-  const [tab, setTab] = useState('comments')
-  const tabsRef = useRef([])
-  const copyId = entry?.copy.id
-  useEffect(() => { setTab('comments') }, [copyId])
+// Fallback sizes (px) if the CSS custom properties can't be read.
+const DEFAULT_SIZES = { spine: 52, gap: 6, more: 48 }
 
-  if (!entry) {
+function readSizes(el) {
+  if (!el || typeof getComputedStyle !== 'function') return DEFAULT_SIZES
+  const cs = getComputedStyle(el)
+  const px = (name, fallback) => {
+    const v = parseFloat(cs.getPropertyValue(name))
+    return Number.isFinite(v) && v > 0 ? v : fallback
+  }
+  return {
+    spine: px('--spine-w', DEFAULT_SIZES.spine),
+    gap: px('--spine-gap', DEFAULT_SIZES.gap),
+    more: px('--more-w', DEFAULT_SIZES.more),
+  }
+}
+
+// Width of an element, kept up to date as the window resizes.
+function useWidth() {
+  const ref = useRef(null)
+  const [state, setState] = useState({ width: 0, sizes: DEFAULT_SIZES })
+  useLayoutEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const measure = () => setState({ width: el.clientWidth, sizes: readSizes(el) })
+    measure()
+    if (typeof ResizeObserver === 'undefined') return
+    const ro = new ResizeObserver(measure)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+  return [ref, state.width, state.sizes]
+}
+
+export default function Bookcase({ books, members, me, myName, myAvatar, onChooseAvatar, nameOf, selectedCopyId, expandedOwner, onOpenCopy, onExpand, onCollapse, onViewList, loading, error, onRetry }) {
+  const tones = useMemo(() => bookcaseTones(books || []), [books])
+  if (error && !books) {
     return (
-      <article className="listing empty-listing" aria-labelledby="listing-title">
-        <div>
-          <span className="eyebrow">Book listing</span>
-          <h2 id="listing-title" ref={headingRef} tabIndex={-1}>Pick a spine</h2>
-          <p className="muted">Choose any book on the shelves above to see where it is, who's read it, and how to borrow it.</p>
-          {onAddBook && <button type="button" className="btn" onClick={onAddBook}>Add a book you own</button>}
+      <section className="bookcase" aria-label="Bookcase">
+        <div className="bookcase-msg">
+          <strong>Couldn't open the shelves</strong>
+          <span>{error}</span>
+          <button type="button" className="btn small" onClick={onRetry}>Try again</button>
         </div>
-      </article>
+      </section>
+    )
+  }
+  if (loading) {
+    return (
+      <section className="bookcase" aria-label="Bookcase" aria-busy="true">
+        <div className="bookcase-msg"><strong>Opening the shelves…</strong></div>
+      </section>
     )
   }
 
-  const { copy, book } = entry
-  const isOwner = copy.owner_id === me
-  const ownerName = isOwner ? myName : nameOf(copy.owner_id)
-  const where = availabilityText(copy, me, nameOf)
-  const tabs = [
-    ['comments', `${possessive(ownerName)} comments`],
-    ['log', 'Library log'],
-  ]
+  // Your shelf first, then everyone else alphabetically.
+  const owners = [...members].sort((a, b) => (b.id === me) - (a.id === me) || a.name.localeCompare(b.name))
+  const total = books.reduce((n, b) => n + b.copies.length, 0)
+  const label = (id) => (id === me ? myName : nameOf(id))
+  // Your own avatar comes from your profile (updates the moment you pick one).
+  const avatarOf = (id) => (id === me ? myAvatar : members.find((m) => m.id === id)?.avatar) || null
+  // null when there's nothing to show, so that shelf keeps its full width for books
+  const decoFor = (id) => (findAvatar(avatarOf(id)) || (id === me && onChooseAvatar)
+    ? <ShelfDeco avatar={avatarOf(id)} isMe={id === me} onChoose={onChooseAvatar} />
+    : null)
 
-  // Arrow keys move between tabs (standard tab pattern).
-  function onTabKey(e, i) {
-    if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return
-    e.preventDefault()
-    const j = (i + (e.key === 'ArrowRight' ? 1 : -1) + tabs.length) % tabs.length
-    setTab(tabs[j][0])
-    tabsRef.current[j]?.focus()
+  if (expandedOwner) {
+    const items = shelfCopies(books, expandedOwner)
+    return (
+      <section className="bookcase" aria-labelledby="expanded-shelf-title">
+        <div className="bookcase-head">
+          <div>
+            <span className="eyebrow">The complete shelf</span>
+            <h2 id="expanded-shelf-title">On {possessive(label(expandedOwner))} shelf</h2>
+          </div>
+          <div className="bookcase-head-actions">
+            <span className="book-count">{items.length} {items.length === 1 ? 'book' : 'books'}</span>
+            <button type="button" className="linkish small" onClick={() => onViewList(expandedOwner)}>View as a list</button>
+            <button type="button" className="btn small ghost" onClick={onCollapse}>Back to the bookcase</button>
+          </div>
+        </div>
+        <FullShelf items={items} me={me} nameOf={nameOf} selectedCopyId={selectedCopyId} onOpenCopy={onOpenCopy} ownerName={label(expandedOwner)} tones={tones}
+          deco={decoFor(expandedOwner)} />
+      </section>
+    )
   }
 
   return (
-    <article className="listing" aria-labelledby="listing-title">
-      <BookCover title={book.title} author={book.author} tone={tone || spineTone(copy.id)} />
-      <div className="book-copy">
-        <span className="eyebrow">{isOwner ? 'From your shelf' : `From ${possessive(ownerName)} shelf`}</span>
-        <h2 id="listing-title" ref={headingRef} tabIndex={-1}>
-          {book.title}
-          {isStarred(book, members) && <span className="star" title="Everyone in the library has read this">★ Read by everyone</span>}
-        </h2>
-        {book.author && <p className="author">by {book.author}</p>}
-
-        <div className="tabs" role="tablist" aria-label="About this copy">
-          {tabs.map(([key, label], i) => (
-            <button
-              key={key}
-              ref={(el) => (tabsRef.current[i] = el)}
-              type="button"
-              role="tab"
-              id={`tab-${key}`}
-              aria-selected={tab === key}
-              aria-controls={`panel-${key}`}
-              tabIndex={tab === key ? 0 : -1}
-              className={tab === key ? 'active' : ''}
-              onClick={() => setTab(key)}
-              onKeyDown={(e) => onTabKey(e, i)}
-            >{label}</button>
-          ))}
+    <section className="bookcase" aria-labelledby="bookcase-title">
+      <div className="bookcase-head">
+        <div>
+          <span className="eyebrow">The community bookcase</span>
+          <h2 id="bookcase-title">Friends’ shelves</h2>
         </div>
-
-        {tab === 'comments' ? (
-          <div className="details-panel" role="tabpanel" id="panel-comments" aria-labelledby="tab-comments">
-            <dl className="facts">
-              <div><dt>Owner</dt><dd>{isOwner ? `${myName} (you)` : ownerName}</dd></div>
-              <div>
-                <dt>Location</dt>
-                <dd className={`availability ${copy.status === 'lent' ? 'out' : 'in'}`}>
-                  <i aria-hidden="true" />{where}{copy.status === 'lent' && copy.lent_at ? ` since ${fmtDate(copy.lent_at)}` : ''}
-                </dd>
-              </div>
-              <div>
-                <dt>Availability</dt>
-                <dd>{!copy.lendable ? 'Not lending right now' : copy.status === 'lent' ? 'Out on loan' : isOwner ? 'On your shelf' : 'Available to borrow'}{copy.queue.length > 0 ? ` · ${copy.queue.length} in line` : ''}</dd>
-              </div>
-            </dl>
-
-            <CopyRow copy={copy} me={me} members={members} nameOf={nameOf} actions={actions} compact hideHistory />
-
-            <Verdicts book={book} nameOf={nameOf} />
-            <ReadingControls book={book} me={me} actions={actions} layout="labeled" />
-
-            <Comments copy={copy} me={me} isOwner={isOwner} nameOf={nameOf} myName={myName} showToast={showToast} />
-          </div>
-        ) : (
-          <div className="log-panel" role="tabpanel" id="panel-log" aria-labelledby="tab-log">
-            <LibraryLog copy={copy} nameOf={nameOf} />
-          </div>
-        )}
+        <div className="bookcase-head-actions">
+          <span className="legend"><i className="legend-ribbon" aria-hidden="true" />Out on loan</span>
+          <span className="book-count">{total} {total === 1 ? 'book' : 'books'} in this library</span>
+        </div>
       </div>
-    </article>
+      {owners.map((m) => (
+        <ShelfRow
+          key={m.id}
+          ownerId={m.id}
+          ownerName={label(m.id)}
+          items={shelfCopies(books, m.id)}
+          me={me}
+          nameOf={nameOf}
+          selectedCopyId={selectedCopyId}
+          onOpenCopy={onOpenCopy}
+          onExpand={() => onExpand(m.id)}
+          tones={tones}
+          deco={decoFor(m.id)}
+        />
+      ))}
+    </section>
   )
-})
+}
 
-export default BookListing
+export function ShelfRow({ ownerId, ownerName, items, me, nameOf, selectedCopyId, onOpenCopy, onExpand, deco = null, tones }) {
+  const [ref, width, sizes] = useWidth()
+  const shown = fitCount(width, items.length, sizes)
+  const hidden = items.length - shown
+  const headingId = `shelf-${ownerId}`
 
-export function BookCover({ title, author, tone }) {
   return (
-    <div className={`cover tone-${tone}`} aria-hidden="true">
-      <span>THE GLAM SHELF</span>
-      <strong>{title}</strong>
-      {author && <i>by {author}</i>}
+    <div className="person-shelf" role="group" aria-labelledby={headingId}>
+      <div className="shelf-label">
+        <h3 id={headingId}>On <strong>{possessive(ownerName)}</strong> shelf</h3>
+        <small>{items.length} {items.length === 1 ? 'book' : 'books'}</small>
+      </div>
+      <div className={`shelf-scene${items.length === 0 ? ' is-empty' : ''}`}>
+        <div className="spines" ref={ref}>
+          {items.length === 0 ? (
+            <p className="shelf-empty">{ownerId === me ? 'Nothing here yet. Add a book you own to fill your shelf.' : 'No books on this shelf yet.'}</p>
+          ) : (
+            <ul className="spine-list">
+              {items.slice(0, shown).map(({ copy, book }) => (
+                <li key={copy.id}>
+                  <Spine copy={copy} book={book} me={me} nameOf={nameOf} ownerName={ownerName} selected={copy.id === selectedCopyId} onOpen={onOpenCopy} tone={tones?.[copy.id]} />
+                </li>
+              ))}
+            </ul>
+          )}
+          {hidden > 0 && (
+            <button type="button" className="more-books" onClick={onExpand}
+              aria-label={`See all ${items.length} books on ${possessive(ownerName)} shelf (${hidden} more)`}>
+              <span aria-hidden="true">•••</span>
+            </button>
+          )}
+        </div>
+        {deco}
+        <div className="shelf-board" aria-hidden="true" />
+      </div>
     </div>
   )
 }
 
-export function LibraryLog({ copy, nameOf }) {
-  const events = libraryLog(copy, nameOf)
+// The avatar standing at the end of a shelf. Takes its width out of the shelf
+// before the spines are counted, so the ••• logic stays right.
+export function ShelfDeco({ avatar, isMe, onChoose }) {
+  if (findAvatar(avatar)) {
+    return <div className="shelf-deco"><ShelfObject id={avatar} /></div>
+  }
+  if (isMe && onChoose) {
+    return (
+      <div className="shelf-deco">
+        <button type="button" className="deco-pick" onClick={onChoose}>
+          <span aria-hidden="true">+</span>Pick a shelf object
+        </button>
+      </div>
+    )
+  }
+  return null
+}
+
+function FullShelf({ items, me, nameOf, selectedCopyId, onOpenCopy, ownerName, deco = null, tones }) {
+  const [ref, width, sizes] = useWidth()
+  const rows = chunkRows(items, width, sizes)
   return (
-    <ol className="log-list" aria-label="Library log, oldest first">
-      {events.map((e, i) => (
-        <li className={`log-row ${e.kind}`} key={`${e.kind}-${e.at}-${i}`}>
-          <span className="log-icon" aria-hidden="true">
-            <svg viewBox="0 0 24 24"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v16H6.5A2.5 2.5 0 0 0 4 21.5z" /><path d="M4 5.5v16M8 7h8" /></svg>
-          </span>
-          <p>{e.text}</p>
-          <time dateTime={e.at}>{fmtDate(e.at, { year: true })}</time>
-        </li>
+    <div className="person-shelf full">
+      {/* zero-height row with the same padding as a shelf, used only to measure the usable width */}
+      <div className="shelf-scene measure" aria-hidden="true"><div className="spines" ref={ref} />{deco && <div className="shelf-deco" />}</div>
+      {items.length === 0 && (
+        <div className="shelf-scene is-empty"><div className="spines"><p className="shelf-empty">No books on this shelf yet.</p></div>{deco}<div className="shelf-board" aria-hidden="true" /></div>
+      )}
+      {rows.map((row, i) => (
+        <div className="shelf-scene" key={i}>
+          <div className="spines">
+            <ul className="spine-list">
+              {row.map(({ copy, book }) => (
+                <li key={copy.id}>
+                  <Spine copy={copy} book={book} me={me} nameOf={nameOf} ownerName={ownerName} selected={copy.id === selectedCopyId} onOpen={onOpenCopy} tone={tones?.[copy.id]} />
+                </li>
+              ))}
+            </ul>
+          </div>
+          {i === 0 ? deco : deco && <div className="shelf-deco" />}
+          <div className="shelf-board" aria-hidden="true" />
+        </div>
       ))}
-    </ol>
+    </div>
   )
 }
 
-// Comments on one copy, saved in the `comments` table (update-4.sql).
-export function Comments({ copy, me, isOwner, nameOf, myName, showToast }) {
-  const [items, setItems] = useState(null)
-  const [missing, setMissing] = useState(false)
-  const [body, setBody] = useState('')
-  const [busy, setBusy] = useState(false)
-  const [confirmId, setConfirmId] = useState(null)
-
-  const load = useCallback(async () => {
-    const { data, error } = await supabase
-      .from('comments')
-      .select('id, user_id, body, created_at')
-      .eq('copy_id', copy.id)
-      .order('created_at', { ascending: true })
-    if (error) {
-      // The table arrives with update-4.sql; until then, say so instead of breaking the page.
-      if (/comments/i.test(error.message || '') && /(schema cache|does not exist|not find)/i.test(error.message || '')) setMissing(true)
-      else showToast(friendlyError(error))
-      setItems([])
-      return
-    }
-    setItems(data || [])
-  }, [copy.id, showToast])
-
-  useEffect(() => {
-    setItems(null); setConfirmId(null)
-    load()
-    const channel = supabase
-      .channel('comments-' + copy.id)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'comments', filter: `copy_id=eq.${copy.id}` }, () => load())
-      .subscribe()
-    return () => { supabase.removeChannel(channel) }
-  }, [copy.id, load])
-
-  async function post(e) {
-    e.preventDefault()
-    const text = body.trim()
-    if (!text) return
-    setBusy(true)
-    const { error } = await supabase.from('comments').insert({ copy_id: copy.id, user_id: me, body: text })
-    setBusy(false)
-    if (error) { showToast(friendlyError(error)); return }
-    setBody('')
-    load()
-  }
-
-  async function remove(id) {
-    const { error } = await supabase.from('comments').delete().eq('id', id)
-    setConfirmId(null)
-    if (error) { showToast(friendlyError(error)); return }
-    load()
-  }
-
-  if (missing) {
-    return <p className="hint">Comments need the latest database update (update-4.sql in the supabase folder).</p>
-  }
-
+export function Spine({ copy, book, me, nameOf, ownerName, selected, onOpen, tone }) {
+  const where = availabilityText(copy, me, nameOf)
+  const out = copy.status === 'lent'
+  const label = `${book.title}${book.author ? ` by ${book.author}` : ''}. ${possessive(ownerName)} copy. ${where}.`
   return (
-    <section className="comments" aria-label="Comments">
-      {items === null ? (
-        <p className="hint">Loading comments…</p>
-      ) : items.length === 0 ? (
-        <p className="hint">No comments yet.</p>
-      ) : (
-        <ul className="comment-list">
-          {items.map((c) => {
-            const mine = c.user_id === me
-            return (
-              <li className="reader-comment" key={c.id}>
-                <div className="comment-meta">
-                  <strong>{mine ? myName : nameOf(c.user_id)}</strong>
-                  <time dateTime={c.created_at}>{fmtDate(c.created_at)} · {new Date(c.created_at).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}</time>
-                  {(mine || isOwner) && (
-                    confirmId === c.id ? (
-                      <span className="comment-confirm">
-                        <button type="button" className="linkish small danger-text" onClick={() => remove(c.id)}>Delete</button>
-                        <button type="button" className="linkish small muted" onClick={() => setConfirmId(null)}>Keep</button>
-                      </span>
-                    ) : (
-                      <button type="button" className="linkish small muted" onClick={() => setConfirmId(c.id)}
-                        aria-label={`Delete comment from ${mine ? 'you' : nameOf(c.user_id)}`}>Delete</button>
-                    )
-                  )}
-                </div>
-                <p>{c.body}</p>
-              </li>
-            )
-          })}
-        </ul>
-      )}
-      <form className="comment-form" onSubmit={post}>
-        <label htmlFor={`comment-${copy.id}`}>Comment on this book</label>
-        <div>
-          <input id={`comment-${copy.id}`} value={body} maxLength={2000} onChange={(e) => setBody(e.target.value)} placeholder="Share a thought…" />
-          <button type="submit" disabled={busy || !body.trim()}>Post</button>
-        </div>
-      </form>
-    </section>
+    <button
+      type="button"
+      className={`spine tone-${tone || spineTone(copy.id)}${selected ? ' selected' : ''}${out ? ' out' : ''}`}
+      style={{ '--h': spineHeight(copy.id) }}
+      aria-label={label}
+      aria-pressed={selected}
+      title={`${book.title}${book.author ? ` — ${book.author}` : ''}`}
+      onClick={() => onOpen(copy.id)}
+    >
+      <span className="spine-title">{book.title}</span>
+      {book.author && <small className="spine-author">{book.author.split(' ').slice(-1)[0]}</small>}
+      {out && <i className="spine-ribbon" aria-hidden="true" />}
+    </button>
   )
 }
