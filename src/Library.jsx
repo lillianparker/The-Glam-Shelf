@@ -187,7 +187,7 @@ export default function Library({ group, groups, profile, notice, clearNotice, o
   const tests = {
     all: () => true,
     avail: (b) => b.copies.some((c) => c.status === 'home' && c.lendable && c.owner_id !== me),
-    loved: (b) => b.reading.some((r) => r.rating === 'up'),
+    loved: (b) => b.reading.some((r) => r.rating === 'up' && r.user_id !== me),
     reading: (b) => myMark(b) === 'reading',
     want: (b) => myMark(b) === 'want',
     inline: (b) => b.copies.some((c) => c.queue.some((q) => q.user_id === me)),
