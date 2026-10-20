@@ -66,7 +66,7 @@ export default function Library({ group, groups, profile, notice, clearNotice, o
       for (const c of book.copies) {
         c.queue.sort((x, y) => x.sort_key - y.sort_key || x.joined_at.localeCompare(y.joined_at))
         c.loans = (c.loans || []).sort((x, y) => y.lent_at.localeCompare(x.lent_at))
-        c.book = { id: book.id, title: book.title }
+        c.book = { id: book.id, title: book.title, author: book.author }
       }
     }
     setBooks(b.data.sort((x, y) => x.title.localeCompare(y.title)))
@@ -114,6 +114,8 @@ export default function Library({ group, groups, profile, notice, clearNotice, o
     lendToName: (copy, name) =>
       run(supabase.from('copies').update({ status: 'lent', lent_to_user: null, lent_to_name: name, lent_at: new Date().toISOString() }).eq('id', copy.id), `Lent to ${name}`),
     removeCopy: (copy) => run(supabase.from('copies').delete().eq('id', copy.id), 'Removed from the shelf'),
+    editCopy: (copy, title, author) =>
+      run(supabase.rpc('edit_copy', { cid: copy.id, new_title: title, new_author: author }), 'Book details saved'),
     setLendable: (copy, lendable) =>
       run(supabase.from('copies').update({ lendable }).eq('id', copy.id), lendable ? 'Open for borrowing again' : 'Marked as not lending'),
     joinLine: (copy) => run(supabase.rpc('join_line', { cid: copy.id }), "You're in line"),
@@ -162,6 +164,7 @@ export default function Library({ group, groups, profile, notice, clearNotice, o
   const visible = all
     .filter(person ? personTests[personTab] : tests[filter])
     .filter((b) => !q || `${b.title} ${b.author}`.toLowerCase().includes(q))
+  const scores = useMemo(() => scoreMembers(books || [], members), [books, members])
   const openShelf = (uid) => { setPerson(uid); setPersonTab('owns'); window.scrollTo({ top: 0, behavior: 'smooth' }) }
 
   return (
@@ -171,7 +174,7 @@ export default function Library({ group, groups, profile, notice, clearNotice, o
           <Wordmark />
           <AccountMenu profile={profile} onProfileChange={onProfileChange} showToast={showToast} />
         </div>
-        <GroupBar group={group} groups={groups} members={members} me={me} person={person} onOpenShelf={openShelf} onSwitchGroup={onSwitchGroup} onGroupsChange={onGroupsChange} showToast={showToast} />
+        <GroupBar group={group} groups={groups} members={members} scores={scores} me={me} person={person} onOpenShelf={openShelf} onSwitchGroup={onSwitchGroup} onGroupsChange={onGroupsChange} showToast={showToast} />
       </header>
 
       <main className="stack-lg">
@@ -194,6 +197,7 @@ export default function Library({ group, groups, profile, notice, clearNotice, o
               <h2>{person === me ? 'Your shelf' : `${nameOf(person)}'s shelf`}</h2>
               <button type="button" className="linkish small" onClick={() => setPerson(null)}>Back to all books</button>
             </div>
+            {scores[person] && <ScoreLine s={scores[person]} />}
             <div className="filters" role="group" aria-label="Filter this shelf">
               {[['owns', 'Owns'], ['reading', 'Reading'], ['read', 'Has read'], ['want', 'Wants to read'], ['has', 'Borrowing now']].map(([k, label]) => (
                 <button key={k} type="button" aria-pressed={personTab === k} onClick={() => setPersonTab(k)}>
@@ -232,6 +236,44 @@ export default function Library({ group, groups, profile, notice, clearNotice, o
 
       {toast && <div className="toast" role="status">{toast}</div>}
     </div>
+  )
+}
+
+// Points: +1 per copy you own, +2 per friend you've lent each copy to,
+// +5 per book you've read.
+export const POINTS = { owned: 1, lent: 2, read: 5 }
+
+function scoreMembers(books, members) {
+  const out = Object.fromEntries(members.map((m) => [m.id, { owned: 0, lent: 0, read: 0, total: 0 }]))
+  for (const b of books) {
+    for (const c of b.copies) {
+      const s = out[c.owner_id]
+      if (!s) continue
+      s.owned += 1
+      // count each different borrower once per copy, so lending back and forth doesn't pile up points
+      const borrowers = new Set(
+        (c.loans || [])
+          .map((l) => l.borrower_id || (l.borrower_name ? 'name:' + l.borrower_name.trim().toLowerCase() : null))
+          .filter((k) => k && k !== c.owner_id)
+      )
+      s.lent += borrowers.size
+    }
+    for (const r of b.reading) {
+      if (r.status === 'read' && out[r.user_id]) out[r.user_id].read += 1
+    }
+  }
+  for (const s of Object.values(out)) s.total = s.owned * POINTS.owned + s.lent * POINTS.lent + s.read * POINTS.read
+  return out
+}
+
+function ScoreLine({ s }) {
+  return (
+    <p className="scoreline">
+      <b>{s.total} points</b>
+      <span>{s.owned} {s.owned === 1 ? 'book' : 'books'} owned × 1</span>
+      <span>{s.lent} {s.lent === 1 ? 'lend' : 'lends'} × 2</span>
+      <span>{s.read} read × 5</span>
+    </p>
   )
 }
 
@@ -370,7 +412,7 @@ function BookCard({ book, me, members, nameOf, actions }) {
 
       <div className="mine-row">
         <div className="segmented" role="group" aria-label="Your status for this book">
-          {[['want', 'Want to read'], ['reading', 'Reading'], ['read', 'Read'], ['none', 'None']].map(([v, label]) => (
+          {[['want', 'Want to read'], ['reading', 'Reading'], ['read', 'Read'], ['none', 'Neither']].map(([v, label]) => (
             <button key={v} type="button" aria-pressed={mine === v} onClick={() => mine !== v && actions.setMark(book.id, v)}>{label}</button>
           ))}
         </div>
@@ -390,7 +432,9 @@ function BookCard({ book, me, members, nameOf, actions }) {
 function CopyRow({ copy, me, members, nameOf, actions }) {
   const isOwner = copy.owner_id === me
   const isHolder = copy.lent_to_user === me
-  const [confirming, setConfirming] = useState(null) // 'remove' | 'stop'
+  const [confirming, setConfirming] = useState(null) // 'remove' | 'stop' | 'edit'
+  const [editTitle, setEditTitle] = useState(copy.book.title)
+  const [editAuthor, setEditAuthor] = useState(copy.book.author || '')
   const [otherOpen, setOtherOpen] = useState(false)
   const [otherName, setOtherName] = useState(copy.lent_to_name || '')
   const [showHistory, setShowHistory] = useState(false)
@@ -519,6 +563,26 @@ function CopyRow({ copy, me, members, nameOf, actions }) {
               <button type="button" className="btn small danger" onClick={() => { setConfirming(null); actions.setLendable(copy, false) }}>Stop lending</button>
               <button type="button" className="btn small ghost" onClick={() => setConfirming(null)}>Cancel</button>
             </>
+          ) : confirming === 'edit' ? (
+            <form className="edit-form" onSubmit={async (e) => {
+              e.preventDefault()
+              if (!editTitle.trim()) return
+              const ok = await actions.editCopy(copy, editTitle.trim(), editAuthor.trim())
+              if (ok) setConfirming(null)
+            }}>
+              <label className="field">
+                <span>Title</span>
+                <input id={`edit-title-${copy.id}`} autoFocus required maxLength={300} value={editTitle} onChange={(e) => setEditTitle(e.target.value)} />
+              </label>
+              <label className="field">
+                <span>Author</span>
+                <input id={`edit-author-${copy.id}`} maxLength={200} value={editAuthor} onChange={(e) => setEditAuthor(e.target.value)} />
+              </label>
+              <div className="edit-actions">
+                <button className="btn small" disabled={!editTitle.trim()}>Save</button>
+                <button type="button" className="btn small ghost" onClick={() => { setConfirming(null); setEditTitle(copy.book.title); setEditAuthor(copy.book.author || '') }}>Cancel</button>
+              </div>
+            </form>
           ) : confirming === 'remove' ? (
             <>
               <span className="small">Remove your copy from the shelf?</span>
@@ -531,6 +595,7 @@ function CopyRow({ copy, me, members, nameOf, actions }) {
                 onClick={() => copy.lendable ? (line.length ? setConfirming('stop') : actions.setLendable(copy, false)) : actions.setLendable(copy, true)}>
                 {copy.lendable ? 'Not lending this one' : 'Start lending again'}
               </button>
+              <button type="button" className="linkish small" onClick={() => { setEditTitle(copy.book.title); setEditAuthor(copy.book.author || ''); setConfirming('edit') }}>Edit title or author</button>
               <button type="button" className="linkish small muted" onClick={() => setConfirming('remove')}>Remove</button>
             </>
           )}
@@ -540,7 +605,7 @@ function CopyRow({ copy, me, members, nameOf, actions }) {
   )
 }
 
-function GroupBar({ group, groups, members, me, person, onOpenShelf, onSwitchGroup, onGroupsChange, showToast }) {
+function GroupBar({ group, groups, members, scores, me, person, onOpenShelf, onSwitchGroup, onGroupsChange, showToast }) {
   const inviteUrl = `${window.location.origin}${window.location.pathname}?join=${group.invite_code}`
   const [showLink, setShowLink] = useState(false)
   const [creating, setCreating] = useState(false)
@@ -580,10 +645,14 @@ function GroupBar({ group, groups, members, me, person, onOpenShelf, onSwitchGro
         <button type="button" className="btn small ghost" onClick={() => setCreating((v) => !v)}>New library</button>
       </div>
       <ul className="members" aria-label="Members">
-        {[...members].sort((a, b) => (b.id === me) - (a.id === me) || a.name.localeCompare(b.name)).map((m) => (
+        {[...members]
+          .sort((a, b) => (scores[b.id]?.total || 0) - (scores[a.id]?.total || 0) || a.name.localeCompare(b.name))
+          .map((m) => (
           <li key={m.id}>
-            <button type="button" aria-pressed={person === m.id} onClick={() => onOpenShelf(m.id)}>
+            <button type="button" aria-pressed={person === m.id} onClick={() => onOpenShelf(m.id)}
+              aria-label={`${m.id === me ? 'You' : m.name}, ${scores[m.id]?.total || 0} points`}>
               {m.id === me ? 'You' : m.name}
+              <span className="pts">{scores[m.id]?.total || 0}</span>
             </button>
           </li>
         ))}
@@ -605,28 +674,48 @@ function GroupBar({ group, groups, members, me, person, onOpenShelf, onSwitchGro
 }
 
 function AccountMenu({ profile, onProfileChange, showToast }) {
-  const [editing, setEditing] = useState(false)
+  const [mode, setMode] = useState(null) // 'name' | 'password'
   const [name, setName] = useState(profile.display_name)
+  const [password, setPassword] = useState('')
 
-  async function save(e) {
+  async function saveName(e) {
     e.preventDefault()
     const { data, error } = await supabase.from('profiles').update({ display_name: name.trim() }).eq('id', profile.id).select().single()
     if (error) { showToast(friendlyError(error)); return }
-    onProfileChange(data); setEditing(false); showToast('Name updated')
+    onProfileChange(data); setMode(null); showToast('Name updated')
   }
 
-  if (editing) {
+  async function savePassword(e) {
+    e.preventDefault()
+    const { error } = await supabase.auth.updateUser({ password })
+    if (error) { showToast(friendlyError(error)); return }
+    setPassword(''); setMode(null)
+    showToast('Password saved. Next time, sign in with your email and password.')
+  }
+
+  if (mode === 'name') {
     return (
-      <form className="account inline" onSubmit={save}>
+      <form className="account inline" onSubmit={saveName}>
         <input id="edit-name" autoFocus required maxLength={60} value={name} onChange={(e) => setName(e.target.value)} aria-label="Your name" />
         <button className="btn small">Save</button>
-        <button type="button" className="btn small ghost" onClick={() => setEditing(false)}>Cancel</button>
+        <button type="button" className="btn small ghost" onClick={() => setMode(null)}>Cancel</button>
+      </form>
+    )
+  }
+  if (mode === 'password') {
+    return (
+      <form className="account inline" onSubmit={savePassword}>
+        <input id="set-password" type="password" autoFocus required minLength={8} autoComplete="new-password"
+          placeholder="New password (8+ characters)" value={password} onChange={(e) => setPassword(e.target.value)} aria-label="New password" />
+        <button className="btn small">Save</button>
+        <button type="button" className="btn small ghost" onClick={() => { setPassword(''); setMode(null) }}>Cancel</button>
       </form>
     )
   }
   return (
     <div className="account">
-      <button type="button" className="linkish" onClick={() => setEditing(true)} title="Change your name">{profile.display_name}</button>
+      <button type="button" className="linkish" onClick={() => setMode('name')} title="Change your name">{profile.display_name}</button>
+      <button type="button" className="linkish muted" onClick={() => setMode('password')}>Set password</button>
       <button type="button" className="linkish muted" onClick={() => supabase.auth.signOut()}>Sign out</button>
     </div>
   )
