@@ -1,6 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { supabase, friendlyError } from './supabase.js'
 import Wordmark from './Wordmark.jsx'
+import Bookcase from './Bookcase.jsx'
+import BookListing from './BookListing.jsx'
+import LibraryCard from './LibraryCard.jsx'
+import { scoreMembers, shelfCopies } from './shelf.js'
+import { AddBook, CopyRow, Empty, ReadingControls, ScoreLine, Verdicts, isStarred, joinNames } from './parts.jsx'
+
+export { POINTS } from './shelf.js'
 
 const FILTERS = [
   ['all', 'All books'],
@@ -13,33 +20,31 @@ const FILTERS = [
   ['mine', 'Books I own'],
 ]
 
-const VERDICTS = [
-  ['up', 'Loved it'],
-  ['good', 'It was good'],
-  ['meh', 'It was fine'],
-  ['down', 'Not for me'],
-]
+const HOMEPAGE_HEADLINE = <>Full <em>Glam</em> required.</>
+const HOMEPAGE_TEXT = 'Search for books, upload ones you own, and borrow from friends. Earn points by adding, lending, and reading.'
 
-function fmtDate(iso) {
-  if (!iso) return ''
-  return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
-}
-
-function joinNames(names) {
-  if (names.length <= 2) return names.join(' and ')
-  return names.slice(0, -1).join(', ') + ' and ' + names[names.length - 1]
+function prefersReducedMotion() {
+  try { return window.matchMedia('(prefers-reduced-motion: reduce)').matches } catch { return false }
 }
 
 export default function Library({ group, groups, profile, notice, clearNotice, onSwitchGroup, onProfileChange, onGroupsChange }) {
   const me = profile.id
   const [books, setBooks] = useState(null)
   const [members, setMembers] = useState([])
+  const [loadError, setLoadError] = useState('')
+  const [view, setView] = useState('home')          // 'home' (bookcase) | 'all' (list)
+  const [expandedOwner, setExpandedOwner] = useState(null) // whose complete shelf is open on the bookcase
+  const [selectedCopyId, setSelectedCopyId] = useState(null)
+  const [addOpen, setAddOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [filter, setFilter] = useState('all')
-  const [person, setPerson] = useState(null)       // whose shelf we're looking at
+  const [person, setPerson] = useState(null)       // whose shelf we're looking at in the list
   const [personTab, setPersonTab] = useState('owns')
   const [toast, setToast] = useState('')
   const toastTimer = useRef()
+  const listingHeadingRef = useRef(null)
+  const searchRef = useRef(null)
+  const focusSearch = useRef(false)
 
   const showToast = useCallback((msg) => {
     setToast(msg)
@@ -59,18 +64,25 @@ export default function Library({ group, groups, profile, notice, clearNotice, o
           'reading(user_id, status, rating)'
         )
         .eq('group_id', group.id),
-      supabase.from('group_members').select('user_id, profiles(display_name)').eq('group_id', group.id),
+      supabase.from('group_members').select('user_id, joined_at, profiles(display_name)').eq('group_id', group.id),
     ])
-    if (b.error || m.error) { showToast(friendlyError(b.error || m.error)); return }
+    if (b.error || m.error) {
+      const msg = friendlyError(b.error || m.error)
+      setLoadError(msg)
+      showToast(msg)
+      return
+    }
+    setLoadError('')
     for (const book of b.data) {
       for (const c of book.copies) {
         c.queue.sort((x, y) => x.sort_key - y.sort_key || x.joined_at.localeCompare(y.joined_at))
-        c.loans = (c.loans || []).sort((x, y) => y.lent_at.localeCompare(x.lent_at))
+        // chronological (oldest first), the order the library log reads
+        c.loans = [...(c.loans || [])].sort((x, y) => x.lent_at.localeCompare(y.lent_at))
         c.book = { id: book.id, title: book.title, author: book.author }
       }
     }
     setBooks(b.data.sort((x, y) => x.title.localeCompare(y.title)))
-    setMembers(m.data.map((r) => ({ id: r.user_id, name: r.profiles?.display_name || 'A friend' })))
+    setMembers(m.data.map((r) => ({ id: r.user_id, name: r.profiles?.display_name || 'A friend', joinedAt: r.joined_at })))
   }, [group.id, showToast])
 
   // Initial load + live updates when friends change something.
@@ -135,9 +147,15 @@ export default function Library({ group, groups, profile, notice, clearNotice, o
     },
     setRating: (bookId, rating) =>
       run(supabase.from('reading').update({ rating, updated_at: new Date().toISOString() }).eq('user_id', me).eq('book_id', bookId)),
+    // A verdict only exists on a book you've read, so rating an unread book marks it Read too.
+    rate: (bookId, rating, currentStatus) => {
+      if (currentStatus === 'read') return actions.setRating(bookId, rating)
+      if (rating === null) return Promise.resolve(true)
+      return run(supabase.from('reading').upsert({ user_id: me, book_id: bookId, status: 'read', rating, updated_at: new Date().toISOString() }))
+    },
   }
 
-  // ----- filtering -----
+  // ----- list view filtering -----
   const myMark = (b) => b.reading.find((r) => r.user_id === me)?.status
   const tests = {
     all: () => true,
@@ -165,120 +183,192 @@ export default function Library({ group, groups, profile, notice, clearNotice, o
     .filter(person ? personTests[personTab] : tests[filter])
     .filter((b) => !q || `${b.title} ${b.author}`.toLowerCase().includes(q))
   const scores = useMemo(() => scoreMembers(books || [], members), [books, members])
-  const openShelf = (uid) => { setPerson(uid); setPersonTab('owns'); window.scrollTo({ top: 0, behavior: 'smooth' }) }
+
+  // ----- bookcase selection -----
+  const findEntry = (id) => {
+    if (!id) return null
+    for (const b of all) for (const c of b.copies) if (c.id === id) return { copy: c, book: b }
+    return null
+  }
+  // Default to the first book on your shelf (or anyone's) until a spine is picked.
+  const defaultEntry = shelfCopies(all, me)[0] || members.map((m) => shelfCopies(all, m.id)[0]).find(Boolean) || null
+  const entry = findEntry(selectedCopyId) || defaultEntry
+
+  function openCopy(id) {
+    setSelectedCopyId(id)
+    requestAnimationFrame(() => {
+      const h = listingHeadingRef.current
+      if (!h) return
+      h.focus({ preventScroll: true })
+      h.closest('.listing')?.scrollIntoView?.({ behavior: prefersReducedMotion() ? 'auto' : 'smooth', block: 'start' })
+    })
+  }
+
+  function go(next, opts = {}) {
+    setView(next)
+    if (next === 'home') setExpandedOwner(opts.expand ?? null)
+    if (next === 'all') { setPerson(opts.person ?? null); setPersonTab('owns') }
+    window.scrollTo?.({ top: 0, behavior: prefersReducedMotion() ? 'auto' : 'smooth' })
+  }
+
+  // Member chips: on the bookcase they open that person's complete shelf; in the list they filter.
+  const openShelf = (uid) => {
+    if (view === 'home') { setExpandedOwner(uid); window.scrollTo?.({ top: 0, behavior: prefersReducedMotion() ? 'auto' : 'smooth' }) }
+    else { setPerson(uid); setPersonTab('owns'); window.scrollTo?.({ top: 0, behavior: 'smooth' }) }
+  }
+
+  useEffect(() => {
+    if (view === 'all' && focusSearch.current) { focusSearch.current = false; searchRef.current?.focus() }
+  }, [view])
+
+  const myMember = members.find((m) => m.id === me)
+  const navItems = [
+    ['bookcase', 'Bookcase', view === 'home' && !expandedOwner, () => go('home')],
+    ['mine', 'My shelf', view === 'home' && expandedOwner === me, () => go('home', { expand: me })],
+    ['all', 'All books', view === 'all', () => go('all')],
+  ]
 
   return (
     <div className="page">
-      <header className="top">
-        <div className="top-row">
-          <Wordmark />
+      <header className="topbar">
+        <Wordmark as="p" />
+        <nav aria-label="Main">
+          {navItems.map(([key, label, active, onClick]) => (
+            <button key={key} type="button" className={active ? 'active' : ''} aria-current={active ? 'page' : undefined} onClick={onClick}>{label}</button>
+          ))}
+        </nav>
+        <div className="user-actions">
+          <button type="button" className="icon-button" aria-label="Search books"
+            onClick={() => { focusSearch.current = true; if (view === 'all') searchRef.current?.focus(); else go('all') }}>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="m20 20-4-4" /></svg>
+          </button>
           <AccountMenu profile={profile} onProfileChange={onProfileChange} showToast={showToast} />
         </div>
-        <GroupBar group={group} groups={groups} members={members} scores={scores} me={me} person={person} onOpenShelf={openShelf} onSwitchGroup={onSwitchGroup} onGroupsChange={onGroupsChange} showToast={showToast} />
       </header>
 
-      <main className="stack-lg">
-        <ForYou books={all} me={me} nameOf={nameOf} actions={actions} />
+      <GroupBar group={group} groups={groups} members={members} scores={scores} me={me}
+        person={view === 'home' ? expandedOwner : person} onOpenShelf={openShelf}
+        onSwitchGroup={onSwitchGroup} onGroupsChange={onGroupsChange} showToast={showToast} />
 
-        <input
-          id="search"
-          className="search"
-          type="search"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search a title or author, e.g. The Bell Jar"
-          aria-label="Search books"
-          autoComplete="off"
-        />
-
-        {person ? (
-          <div className="shelf-head">
-            <div className="shelf-title">
-              <h2>{person === me ? 'Your shelf' : `${nameOf(person)}'s shelf`}</h2>
-              <button type="button" className="linkish small" onClick={() => setPerson(null)}>Back to all books</button>
+      {view === 'home' ? (
+        <main className="home stack-lg">
+          <section className="intro">
+            <div>
+              <span className="eyebrow">{group.name}</span>
+              <h1>{HOMEPAGE_HEADLINE}</h1>
+              <p>{HOMEPAGE_TEXT}</p>
             </div>
-            {scores[person] && <ScoreLine s={scores[person]} />}
-            <div className="filters" role="group" aria-label="Filter this shelf">
-              {[['owns', 'Owns'], ['reading', 'Reading'], ['read', 'Has read'], ['want', 'Wants to read'], ['has', 'Borrowing now']].map(([k, label]) => (
-                <button key={k} type="button" aria-pressed={personTab === k} onClick={() => setPersonTab(k)}>
-                  {label}<span className="count">{personCounts[k]}</span>
+            <button type="button" className="btn primary" aria-expanded={addOpen} onClick={() => setAddOpen((v) => !v)}>
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg> Add a book
+            </button>
+          </section>
+
+          {addOpen && <AddBook onAdd={actions.addCopy} open onOpenChange={setAddOpen} />}
+
+          <ForYou books={all} me={me} nameOf={nameOf} actions={actions} />
+
+          <Bookcase
+            books={books}
+            members={members}
+            me={me}
+            myName={profile.display_name}
+            nameOf={nameOf}
+            selectedCopyId={entry?.copy.id}
+            expandedOwner={expandedOwner}
+            onOpenCopy={openCopy}
+            onExpand={setExpandedOwner}
+            onCollapse={() => setExpandedOwner(null)}
+            onViewList={(uid) => go('all', { person: uid })}
+            loading={books === null && !loadError}
+            error={loadError}
+            onRetry={load}
+          />
+
+          <div className="content-grid">
+            {books !== null && (
+              <BookListing
+                key={entry?.copy.id || 'none'}
+                ref={listingHeadingRef}
+                entry={entry}
+                me={me}
+                myName={profile.display_name}
+                members={members}
+                nameOf={nameOf}
+                actions={actions}
+                showToast={showToast}
+                onAddBook={() => { setAddOpen(true); window.scrollTo?.({ top: 0 }) }}
+              />
+            )}
+            <LibraryCard name={profile.display_name} libraryName={group.name} joinedAt={myMember?.joinedAt} score={scores[me]} />
+          </div>
+        </main>
+      ) : (
+        <main className="list-view stack-lg">
+          <h1 className="view-title">All books</h1>
+          <ForYou books={all} me={me} nameOf={nameOf} actions={actions} />
+
+          <input
+            id="search"
+            ref={searchRef}
+            className="search"
+            type="search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search a title or author, e.g. The Bell Jar"
+            aria-label="Search books"
+            autoComplete="off"
+          />
+
+          {person ? (
+            <div className="shelf-head">
+              <div className="shelf-title">
+                <h2>{person === me ? 'Your shelf' : `${nameOf(person)}'s shelf`}</h2>
+                <button type="button" className="linkish small" onClick={() => setPerson(null)}>Back to all books</button>
+                <button type="button" className="linkish small" onClick={() => go('home', { expand: person })}>See it on the bookcase</button>
+              </div>
+              {scores[person] && <ScoreLine s={scores[person]} />}
+              <div className="filters" role="group" aria-label="Filter this shelf">
+                {[['owns', 'Owns'], ['reading', 'Reading'], ['read', 'Has read'], ['want', 'Wants to read'], ['has', 'Borrowing now']].map(([k, label]) => (
+                  <button key={k} type="button" aria-pressed={personTab === k} onClick={() => setPersonTab(k)}>
+                    {label}<span className="count">{personCounts[k]}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div className="filters" role="group" aria-label="Filter books">
+              {FILTERS.map(([k, label]) => (
+                <button key={k} type="button" aria-pressed={filter === k} onClick={() => setFilter(k)}>
+                  {label}<span className="count">{counts[k]}</span>
                 </button>
               ))}
             </div>
-          </div>
-        ) : (
-          <div className="filters" role="group" aria-label="Filter books">
-            {FILTERS.map(([k, label]) => (
-              <button key={k} type="button" aria-pressed={filter === k} onClick={() => setFilter(k)}>
-                {label}<span className="count">{counts[k]}</span>
-              </button>
-            ))}
-          </div>
-        )}
-
-        <AddBook onAdd={actions.addCopy} />
-
-        <section className="list" aria-live="polite">
-          {books === null ? (
-            <Empty title="Opening the shelves…" />
-          ) : all.length === 0 ? (
-            <Empty title="The shelf is empty">Add the first book you own with “+ Add a book you own” above, then send friends the invite link.</Empty>
-          ) : visible.length === 0 ? (
-            q ? <Empty title={`No one has “${query.trim()}”`}>Check the spelling, or try the author's name.</Empty>
-              : <Empty title="Nothing here yet">{person ? 'Nothing in this part of their shelf yet.' : 'Try a different filter.'}</Empty>
-          ) : (
-            visible.map((b) => (
-              <BookCard key={b.id} book={b} me={me} members={members} nameOf={nameOf} actions={actions} />
-            ))
           )}
-        </section>
-      </main>
+
+          <AddBook onAdd={actions.addCopy} />
+
+          <section className="list" aria-live="polite">
+            {books === null ? (
+              loadError
+                ? <Empty title="Couldn't open the shelves">{loadError} <button type="button" className="linkish" onClick={load}>Try again</button></Empty>
+                : <Empty title="Opening the shelves…" />
+            ) : all.length === 0 ? (
+              <Empty title="The shelf is empty">Add the first book you own with “+ Add a book you own” above, then send friends the invite link.</Empty>
+            ) : visible.length === 0 ? (
+              q ? <Empty title={`No one has “${query.trim()}”`}>Check the spelling, or try the author's name.</Empty>
+                : <Empty title="Nothing here yet">{person ? 'Nothing in this part of their shelf yet.' : 'Try a different filter.'}</Empty>
+            ) : (
+              visible.map((b) => (
+                <BookCard key={b.id} book={b} me={me} members={members} nameOf={nameOf} actions={actions} />
+              ))
+            )}
+          </section>
+        </main>
+      )}
 
       {toast && <div className="toast" role="status">{toast}</div>}
     </div>
   )
-}
-
-// Points: +1 per copy you own, +2 per friend you've lent each copy to,
-// +5 per book you've read.
-export const POINTS = { owned: 1, lent: 2, read: 5 }
-
-function scoreMembers(books, members) {
-  const out = Object.fromEntries(members.map((m) => [m.id, { owned: 0, lent: 0, read: 0, total: 0 }]))
-  for (const b of books) {
-    for (const c of b.copies) {
-      const s = out[c.owner_id]
-      if (!s) continue
-      s.owned += 1
-      // count each different borrower once per copy, so lending back and forth doesn't pile up points
-      const borrowers = new Set(
-        (c.loans || [])
-          .map((l) => l.borrower_id || (l.borrower_name ? 'name:' + l.borrower_name.trim().toLowerCase() : null))
-          .filter((k) => k && k !== c.owner_id)
-      )
-      s.lent += borrowers.size
-    }
-    for (const r of b.reading) {
-      if (r.status === 'read' && out[r.user_id]) out[r.user_id].read += 1
-    }
-  }
-  for (const s of Object.values(out)) s.total = s.owned * POINTS.owned + s.lent * POINTS.lent + s.read * POINTS.read
-  return out
-}
-
-function ScoreLine({ s }) {
-  return (
-    <p className="scoreline">
-      <b>{s.total} points</b>
-      <span>{s.owned} {s.owned === 1 ? 'book' : 'books'} owned × 1</span>
-      <span>{s.lent} {s.lent === 1 ? 'lend' : 'lends'} × 2</span>
-      <span>{s.read} read × 5</span>
-    </p>
-  )
-}
-
-function Empty({ title, children }) {
-  return <div className="empty"><strong>{title}</strong>{children}</div>
 }
 
 // Everything waiting on you: hand-offs to make, turns coming up, lines on your books.
@@ -331,78 +421,19 @@ function ForYou({ books, me, nameOf, actions }) {
   )
 }
 
-function AddBook({ onAdd }) {
-  const [open, setOpen] = useState(false)
-  const [title, setTitle] = useState('')
-  const [author, setAuthor] = useState('')
-  const [busy, setBusy] = useState(false)
-  const titleRef = useRef()
-
-  async function submit(e) {
-    e.preventDefault()
-    if (!title.trim()) return
-    setBusy(true)
-    const ok = await onAdd(title.trim(), author.trim())
-    setBusy(false)
-    if (ok) { setTitle(''); setAuthor(''); titleRef.current?.focus() }
-  }
-
-  return (
-    <details className="add" open={open} onToggle={(e) => setOpen(e.currentTarget.open)}>
-      <summary>+ Add a book you own</summary>
-      <form onSubmit={submit} className="add-form">
-        <label className="field">
-          <span>Title</span>
-          <input id="add-title" ref={titleRef} required maxLength={300} value={title} onChange={(e) => setTitle(e.target.value)} />
-        </label>
-        <label className="field">
-          <span>Author</span>
-          <input id="add-author" maxLength={200} value={author} onChange={(e) => setAuthor(e.target.value)} />
-        </label>
-        <button className="btn" disabled={busy || !title.trim()}>Add to shelf</button>
-      </form>
-    </details>
-  )
-}
-
 function BookCard({ book, me, members, nameOf, actions }) {
-  const who = (pred) => book.reading.filter(pred).map((r) => r.user_id)
-  const wanters = who((r) => r.status === 'want')
-  const readingNow = who((r) => r.status === 'reading')
-  const loved = who((r) => r.rating === 'up')
-  const good = who((r) => r.rating === 'good')
-  const fine = who((r) => r.rating === 'meh')
-  const notFor = who((r) => r.rating === 'down')
-  const readNoVerdict = who((r) => r.status === 'read' && !r.rating)
-  const myRow = book.reading.find((r) => r.user_id === me)
-  const mine = myRow?.status || 'none'
-  const myRating = myRow?.rating || null
   const copies = [...book.copies].sort((a, b) => (b.owner_id === me) - (a.owner_id === me) || a.created_at.localeCompare(b.created_at))
-  const names = (ids) => joinNames(ids.map(nameOf))
-  const readIds = new Set(book.reading.filter((r) => r.status === 'read').map((r) => r.user_id))
-  const starred = members.length >= 2 && members.every((m) => readIds.has(m.id))
-
   return (
     <article className="card">
       <div>
         <h2 className="title">
           {book.title}
-          {starred && <span className="star" title="Everyone in the library has read this">★ Read by everyone</span>}
+          {isStarred(book, members) && <span className="star" title="Everyone in the library has read this">★ Read by everyone</span>}
         </h2>
         {book.author && <p className="author">{book.author}</p>}
       </div>
 
-      {(loved.length > 0 || good.length > 0 || fine.length > 0 || notFor.length > 0 || readNoVerdict.length > 0 || readingNow.length > 0 || wanters.length > 0) && (
-        <div className="verdicts">
-          {loved.length > 0 && <span className="v up">Loved by <b>{names(loved)}</b></span>}
-          {good.length > 0 && <span className="v good">Liked by <b>{names(good)}</b></span>}
-          {fine.length > 0 && <span className="v meh">Fine for <b>{names(fine)}</b></span>}
-          {notFor.length > 0 && <span className="v down">Not for <b>{names(notFor)}</b></span>}
-          {readNoVerdict.length > 0 && <span className="v">Read by <b>{names(readNoVerdict)}</b></span>}
-          {readingNow.length > 0 && <span className="v">Reading now: <b>{names(readingNow)}</b></span>}
-          {wanters.length > 0 && <span className="v">Wants to read: <b>{names(wanters)}</b></span>}
-        </div>
-      )}
+      <Verdicts book={book} nameOf={nameOf} />
 
       <div className="copies">
         {copies.map((c) => (
@@ -410,198 +441,8 @@ function BookCard({ book, me, members, nameOf, actions }) {
         ))}
       </div>
 
-      <div className="mine-row">
-        <div className="segmented" role="group" aria-label="Your status for this book">
-          {[['want', 'Want to read'], ['reading', 'Reading'], ['read', 'Read'], ['none', 'Neither']].map(([v, label]) => (
-            <button key={v} type="button" aria-pressed={mine === v} onClick={() => mine !== v && actions.setMark(book.id, v)}>{label}</button>
-          ))}
-        </div>
-        {mine === 'read' && (
-          <div className="segmented verdict" role="group" aria-label="What did you think?">
-            {VERDICTS.map(([v, label]) => (
-              <button key={v} type="button" className={v} aria-pressed={myRating === v}
-                onClick={() => actions.setRating(book.id, myRating === v ? null : v)}>{label}</button>
-            ))}
-          </div>
-        )}
-      </div>
+      <ReadingControls book={book} me={me} actions={actions} />
     </article>
-  )
-}
-
-function CopyRow({ copy, me, members, nameOf, actions }) {
-  const isOwner = copy.owner_id === me
-  const isHolder = copy.lent_to_user === me
-  const [confirming, setConfirming] = useState(null) // 'remove' | 'stop' | 'edit'
-  const [editTitle, setEditTitle] = useState(copy.book.title)
-  const [editAuthor, setEditAuthor] = useState(copy.book.author || '')
-  const [otherOpen, setOtherOpen] = useState(false)
-  const [otherName, setOtherName] = useState(copy.lent_to_name || '')
-  const [showHistory, setShowHistory] = useState(false)
-  const loans = copy.loans
-  const pastLoans = loans.filter((l) => l.returned_at)
-
-  const line = copy.queue
-  const next = line[0]?.user_id
-  const myPlace = line.findIndex((q) => q.user_id === me)
-  const holder = copy.lent_to_user ? nameOf(copy.lent_to_user) : copy.lent_to_name || 'a friend'
-  const others = members.filter((m) => m.id !== me)
-  const selectValue = copy.status === 'lent'
-    ? (copy.lent_to_user && others.some((m) => m.id === copy.lent_to_user) ? copy.lent_to_user : '__other')
-    : 'home'
-
-  function onSelect(e) {
-    const v = e.target.value
-    if (v === '__other') { setOtherOpen(true); return }
-    setOtherOpen(false)
-    if (v === 'home') actions.setHome(copy)
-    else actions.lendTo(copy, v)
-  }
-
-  let chip
-  if (copy.status === 'lent') {
-    chip = <span className="chip lent">With {holder === 'You' ? 'you' : holder}{copy.lent_at ? ` · since ${fmtDate(copy.lent_at)}` : ''}</span>
-  } else {
-    chip = <span className="chip home">{isOwner ? 'At your home' : `At ${nameOf(copy.owner_id)}'s`}</span>
-  }
-
-  let controls = null
-  if (isOwner) {
-    controls = (
-      <>
-        <select id={`loc-${copy.id}`} aria-label="Where is this copy?" value={otherOpen ? '__other' : selectValue} onChange={onSelect}>
-          <option value="home">At my home</option>
-          {others.map((m) => <option key={m.id} value={m.id}>With {m.name}</option>)}
-          <option value="__other">With someone else…</option>
-        </select>
-        {otherOpen && (
-          <form className="inline" onSubmit={(e) => { e.preventDefault(); if (otherName.trim()) { actions.lendToName(copy, otherName.trim()); setOtherOpen(false) } }}>
-            <input id={`other-${copy.id}`} autoFocus maxLength={60} placeholder="Their name" value={otherName} onChange={(e) => setOtherName(e.target.value)} />
-            <button className="btn small">Save</button>
-          </form>
-        )}
-        {copy.status === 'home' && next && (
-          <button type="button" className="btn small" onClick={() => actions.passOn(copy)}>Gave it to {nameOf(next)}</button>
-        )}
-      </>
-    )
-  } else if (isHolder) {
-    controls = (
-      <>
-        {next && <button type="button" className="btn small" onClick={() => actions.passOn(copy)}>Gave it to {nameOf(next)}</button>}
-        <button type="button" className="btn small ghost" onClick={() => actions.setHome(copy)}>Gave it back to {nameOf(copy.owner_id)}</button>
-      </>
-    )
-  } else if (myPlace >= 0) {
-    controls = (
-      <>
-        <span className="place">{myPlace === 0 ? "You're next" : `You're #${myPlace + 1} in line`}</span>
-        <button type="button" className="btn small ghost" onClick={() => actions.leaveLine(copy)}>Leave line</button>
-      </>
-    )
-  } else if (copy.lendable) {
-    controls = (
-      <>
-        <button type="button" className="btn small" onClick={() => actions.joinLine(copy)}>Get in line</button>
-        {copy.status === 'home' && line.length === 0 && (
-          <button type="button" className="btn small ghost" onClick={() => actions.lendTo(copy, me)}>I already borrowed it</button>
-        )}
-      </>
-    )
-  }
-
-  return (
-    <div className="copy">
-      <div className="copy-main">
-        <span className="owner">{isOwner ? 'Your copy' : `${nameOf(copy.owner_id)}'s copy`}</span>
-        {chip}
-        {!copy.lendable && <span className="chip off">Not lending</span>}
-        <div className="ctrl">{controls}</div>
-      </div>
-
-      {line.length > 0 && (
-        <ol className="line" aria-label="Line to borrow this copy">
-          <li className="line-label">In line</li>
-          {line.map((q, i) => (
-            <li key={q.user_id} className={q.user_id === me ? 'me' : ''}>
-              <span className="n">{i + 1}</span>{nameOf(q.user_id)}
-              {isOwner && (
-                <span className="line-ctrl">
-                  <button type="button" aria-label={`Move ${nameOf(q.user_id)} up`} disabled={i === 0} onClick={() => actions.moveInLine(copy, q.user_id, -1)}>↑</button>
-                  <button type="button" aria-label={`Move ${nameOf(q.user_id)} down`} disabled={i === line.length - 1} onClick={() => actions.moveInLine(copy, q.user_id, 1)}>↓</button>
-                  <button type="button" aria-label={`Take ${nameOf(q.user_id)} off the line`} onClick={() => actions.removeFromLine(copy, q.user_id)}>×</button>
-                </span>
-              )}
-            </li>
-          ))}
-        </ol>
-      )}
-
-      {loans.length > 0 && (
-        <div className="history">
-          <button type="button" className="linkish small muted" aria-expanded={showHistory} onClick={() => setShowHistory((v) => !v)}>
-            {showHistory ? 'Hide history' : `Borrowing history · ${pastLoans.length === 0 ? 'first time out' : `lent ${loans.length} ${loans.length === 1 ? 'time' : 'times'}`}`}
-          </button>
-          {showHistory && (
-            <ol className="history-list">
-              {loans.map((l) => (
-                <li key={l.id}>
-                  <b>{l.borrower_id ? nameOf(l.borrower_id) : l.borrower_name || 'A friend'}</b>
-                  <span className="muted">{fmtDate(l.lent_at)} – {l.returned_at ? fmtDate(l.returned_at) : 'now'}</span>
-                </li>
-              ))}
-            </ol>
-          )}
-        </div>
-      )}
-
-      {isOwner && (
-        <div className="owner-tools">
-          {confirming === 'stop' ? (
-            <>
-              <span className="small">Stop lending? This clears the line ({line.length}).</span>
-              <button type="button" className="btn small danger" onClick={() => { setConfirming(null); actions.setLendable(copy, false) }}>Stop lending</button>
-              <button type="button" className="btn small ghost" onClick={() => setConfirming(null)}>Cancel</button>
-            </>
-          ) : confirming === 'edit' ? (
-            <form className="edit-form" onSubmit={async (e) => {
-              e.preventDefault()
-              if (!editTitle.trim()) return
-              const ok = await actions.editCopy(copy, editTitle.trim(), editAuthor.trim())
-              if (ok) setConfirming(null)
-            }}>
-              <label className="field">
-                <span>Title</span>
-                <input id={`edit-title-${copy.id}`} autoFocus required maxLength={300} value={editTitle} onChange={(e) => setEditTitle(e.target.value)} />
-              </label>
-              <label className="field">
-                <span>Author</span>
-                <input id={`edit-author-${copy.id}`} maxLength={200} value={editAuthor} onChange={(e) => setEditAuthor(e.target.value)} />
-              </label>
-              <div className="edit-actions">
-                <button className="btn small" disabled={!editTitle.trim()}>Save</button>
-                <button type="button" className="btn small ghost" onClick={() => { setConfirming(null); setEditTitle(copy.book.title); setEditAuthor(copy.book.author || '') }}>Cancel</button>
-              </div>
-            </form>
-          ) : confirming === 'remove' ? (
-            <>
-              <span className="small">Remove your copy from the shelf?</span>
-              <button type="button" className="btn small danger" onClick={() => actions.removeCopy(copy)}>Yes, remove</button>
-              <button type="button" className="btn small ghost" onClick={() => setConfirming(null)}>Keep</button>
-            </>
-          ) : (
-            <>
-              <button type="button" className="linkish small"
-                onClick={() => copy.lendable ? (line.length ? setConfirming('stop') : actions.setLendable(copy, false)) : actions.setLendable(copy, true)}>
-                {copy.lendable ? 'Not lending this one' : 'Start lending again'}
-              </button>
-              <button type="button" className="linkish small" onClick={() => { setEditTitle(copy.book.title); setEditAuthor(copy.book.author || ''); setConfirming('edit') }}>Edit title or author</button>
-              <button type="button" className="linkish small muted" onClick={() => setConfirming('remove')}>Remove</button>
-            </>
-          )}
-        </div>
-      )}
-    </div>
   )
 }
 
@@ -720,3 +561,4 @@ function AccountMenu({ profile, onProfileChange, showToast }) {
     </div>
   )
 }
+
