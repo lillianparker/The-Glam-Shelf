@@ -1,5 +1,7 @@
 // The homepage bookcase: one shelf row per member, each copy a spine.
 import { useLayoutEffect, useRef, useState } from 'react'
+import { ShelfObject } from './AvatarPicker.jsx'
+import { findAvatar } from './avatars.js'
 import { availabilityText, chunkRows, fitCount, possessive, shelfCopies, spineHeight, spineTone } from './shelf.js'
 
 // Fallback sizes (px) if the CSS custom properties can't be read.
@@ -36,7 +38,7 @@ function useWidth() {
   return [ref, state.width, state.sizes]
 }
 
-export default function Bookcase({ books, members, me, myName, nameOf, selectedCopyId, expandedOwner, onOpenCopy, onExpand, onCollapse, onViewList, loading, error, onRetry }) {
+export default function Bookcase({ books, members, me, myName, myAvatar, onChooseAvatar, nameOf, selectedCopyId, expandedOwner, onOpenCopy, onExpand, onCollapse, onViewList, loading, error, onRetry }) {
   if (error && !books) {
     return (
       <section className="bookcase" aria-label="Bookcase">
@@ -60,6 +62,12 @@ export default function Bookcase({ books, members, me, myName, nameOf, selectedC
   const owners = [...members].sort((a, b) => (b.id === me) - (a.id === me) || a.name.localeCompare(b.name))
   const total = books.reduce((n, b) => n + b.copies.length, 0)
   const label = (id) => (id === me ? myName : nameOf(id))
+  // Your own avatar comes from your profile (updates the moment you pick one).
+  const avatarOf = (id) => (id === me ? myAvatar : members.find((m) => m.id === id)?.avatar) || null
+  // null when there's nothing to show, so that shelf keeps its full width for books
+  const decoFor = (id) => (findAvatar(avatarOf(id)) || (id === me && onChooseAvatar)
+    ? <ShelfDeco avatar={avatarOf(id)} isMe={id === me} onChoose={onChooseAvatar} />
+    : null)
 
   if (expandedOwner) {
     const items = shelfCopies(books, expandedOwner)
@@ -76,7 +84,8 @@ export default function Bookcase({ books, members, me, myName, nameOf, selectedC
             <button type="button" className="btn small ghost" onClick={onCollapse}>Back to the bookcase</button>
           </div>
         </div>
-        <FullShelf items={items} me={me} nameOf={nameOf} selectedCopyId={selectedCopyId} onOpenCopy={onOpenCopy} ownerName={label(expandedOwner)} />
+        <FullShelf items={items} me={me} nameOf={nameOf} selectedCopyId={selectedCopyId} onOpenCopy={onOpenCopy} ownerName={label(expandedOwner)}
+          deco={decoFor(expandedOwner)} />
       </section>
     )
   }
@@ -104,13 +113,14 @@ export default function Bookcase({ books, members, me, myName, nameOf, selectedC
           selectedCopyId={selectedCopyId}
           onOpenCopy={onOpenCopy}
           onExpand={() => onExpand(m.id)}
+          deco={decoFor(m.id)}
         />
       ))}
     </section>
   )
 }
 
-export function ShelfRow({ ownerId, ownerName, items, me, nameOf, selectedCopyId, onOpenCopy, onExpand }) {
+export function ShelfRow({ ownerId, ownerName, items, me, nameOf, selectedCopyId, onOpenCopy, onExpand, deco = null }) {
   const [ref, width, sizes] = useWidth()
   const shown = fitCount(width, items.length, sizes)
   const hidden = items.length - shown
@@ -142,21 +152,40 @@ export function ShelfRow({ ownerId, ownerName, items, me, nameOf, selectedCopyId
             </button>
           )}
         </div>
+        {deco}
         <div className="shelf-board" aria-hidden="true" />
       </div>
     </div>
   )
 }
 
-function FullShelf({ items, me, nameOf, selectedCopyId, onOpenCopy, ownerName }) {
+// The avatar standing at the end of a shelf. Takes its width out of the shelf
+// before the spines are counted, so the ••• logic stays right.
+export function ShelfDeco({ avatar, isMe, onChoose }) {
+  if (findAvatar(avatar)) {
+    return <div className="shelf-deco"><ShelfObject id={avatar} /></div>
+  }
+  if (isMe && onChoose) {
+    return (
+      <div className="shelf-deco">
+        <button type="button" className="deco-pick" onClick={onChoose}>
+          <span aria-hidden="true">+</span>Pick a shelf object
+        </button>
+      </div>
+    )
+  }
+  return null
+}
+
+function FullShelf({ items, me, nameOf, selectedCopyId, onOpenCopy, ownerName, deco = null }) {
   const [ref, width, sizes] = useWidth()
   const rows = chunkRows(items, width, sizes)
   return (
     <div className="person-shelf full">
       {/* zero-height row with the same padding as a shelf, used only to measure the usable width */}
-      <div className="shelf-scene measure" aria-hidden="true"><div className="spines" ref={ref} /></div>
+      <div className="shelf-scene measure" aria-hidden="true"><div className="spines" ref={ref} />{deco && <div className="shelf-deco" />}</div>
       {items.length === 0 && (
-        <div className="shelf-scene is-empty"><div className="spines"><p className="shelf-empty">No books on this shelf yet.</p></div><div className="shelf-board" aria-hidden="true" /></div>
+        <div className="shelf-scene is-empty"><div className="spines"><p className="shelf-empty">No books on this shelf yet.</p></div>{deco}<div className="shelf-board" aria-hidden="true" /></div>
       )}
       {rows.map((row, i) => (
         <div className="shelf-scene" key={i}>
@@ -169,6 +198,7 @@ function FullShelf({ items, me, nameOf, selectedCopyId, onOpenCopy, ownerName })
               ))}
             </ul>
           </div>
+          {i === 0 ? deco : deco && <div className="shelf-deco" />}
           <div className="shelf-board" aria-hidden="true" />
         </div>
       ))}

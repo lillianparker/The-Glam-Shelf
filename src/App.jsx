@@ -3,6 +3,7 @@ import { supabase, configured, friendlyError } from './supabase.js'
 import { TAGLINE } from './config.js'
 import Library from './Library.jsx'
 import Wordmark from './Wordmark.jsx'
+import AvatarPicker from './AvatarPicker.jsx'
 
 const JOIN_KEY = 'glam_pending_join'
 const GROUP_KEY = 'glam_current_group'
@@ -283,13 +284,19 @@ function NewPassword({ onDone }) {
 
 function NameSetup({ userId, email, onDone }) {
   const [name, setName] = useState('')
+  const [avatar, setAvatar] = useState(null)
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
 
   async function submit(e) {
     e.preventDefault()
     setSaving(true); setError('')
-    const { data, error } = await supabase.from('profiles').insert({ id: userId, display_name: name.trim() }).select().single()
+    const row = { id: userId, display_name: name.trim(), ...(avatar ? { avatar } : {}) }
+    let { data, error } = await supabase.from('profiles').insert(row).select().single()
+    if (error && avatar && /avatar/i.test(error.message || '')) {
+      // database not updated for avatars yet (update-5.sql): save the name anyway
+      ;({ data, error } = await supabase.from('profiles').insert({ id: userId, display_name: name.trim() }).select().single())
+    }
     setSaving(false)
     if (error) setError(friendlyError(error))
     else onDone(data)
@@ -306,6 +313,10 @@ function NameSetup({ userId, email, onDone }) {
             <span>Your name</span>
             <input id="display-name" required maxLength={60} value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Ted" />
           </label>
+          <div className="field">
+            <span id="setup-avatar-label">Pick an object for your shelf (optional)</span>
+            <AvatarPicker value={avatar} onChange={setAvatar} label="Pick an object for your shelf" />
+          </div>
           <button className="btn" disabled={saving || !name.trim()}>Continue</button>
           {error && <p className="error">{error}</p>}
         </form>

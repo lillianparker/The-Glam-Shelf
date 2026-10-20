@@ -1,7 +1,8 @@
 // The signed-in member's library card: real name, library, join date and points.
 import { fmtDate } from './parts.jsx'
+import { AvatarBadge } from './AvatarPicker.jsx'
 
-export default function LibraryCard({ name, libraryName, joinedAt, score }) {
+export default function LibraryCard({ name, avatar, libraryName, joinedAt, score }) {
   const s = score || { owned: 0, lent: 0, read: 0, total: 0 }
   return (
     <aside className="library-card" aria-label="Your library card">
@@ -10,8 +11,13 @@ export default function LibraryCard({ name, libraryName, joinedAt, score }) {
         <p>Library card<br /><strong>{libraryName}</strong></p>
       </div>
       <div className="card-body">
-        <span className="eyebrow">Member</span>
-        <h2>{name}</h2>
+        <div className="card-member">
+          <AvatarBadge id={avatar} name={name} size="lg" />
+          <div>
+            <span className="eyebrow">Member</span>
+            <h2>{name}</h2>
+          </div>
+        </div>
         <div className="points">
           <strong>{s.total}</strong>
           <span>community<br />points</span>

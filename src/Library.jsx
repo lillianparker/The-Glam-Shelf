@@ -4,6 +4,7 @@ import Wordmark from './Wordmark.jsx'
 import Bookcase from './Bookcase.jsx'
 import BookListing from './BookListing.jsx'
 import LibraryCard from './LibraryCard.jsx'
+import AvatarPicker, { AvatarBadge } from './AvatarPicker.jsx'
 import { scoreMembers, shelfCopies } from './shelf.js'
 import { AddBook, CopyRow, Empty, ReadingControls, ScoreLine, Verdicts, isStarred, joinNames } from './parts.jsx'
 
@@ -23,6 +24,16 @@ const FILTERS = [
 const HOMEPAGE_HEADLINE = <>Full <em>Glam</em> required.</>
 const HOMEPAGE_TEXT = 'Search for books, upload ones you own, and borrow from friends. Earn points by adding, lending, and reading.'
 
+// Members with their names and avatars. If the avatar column doesn't exist yet
+// (update-5.sql not run), load without it so nothing else breaks.
+async function loadMembers(groupId) {
+  const res = await supabase.from('group_members').select('user_id, joined_at, profiles(display_name, avatar)').eq('group_id', groupId)
+  if (res.error && /avatar/i.test(res.error.message || '')) {
+    return supabase.from('group_members').select('user_id, joined_at, profiles(display_name)').eq('group_id', groupId)
+  }
+  return res
+}
+
 function prefersReducedMotion() {
   try { return window.matchMedia('(prefers-reduced-motion: reduce)').matches } catch { return false }
 }
@@ -36,6 +47,8 @@ export default function Library({ group, groups, profile, notice, clearNotice, o
   const [expandedOwner, setExpandedOwner] = useState(null) // whose complete shelf is open on the bookcase
   const [selectedCopyId, setSelectedCopyId] = useState(null)
   const [addOpen, setAddOpen] = useState(false)
+  const [avatarOpen, setAvatarOpen] = useState(false)
+  const [savingAvatar, setSavingAvatar] = useState(false)
   const [query, setQuery] = useState('')
   const [filter, setFilter] = useState('all')
   const [person, setPerson] = useState(null)       // whose shelf we're looking at in the list
@@ -64,7 +77,7 @@ export default function Library({ group, groups, profile, notice, clearNotice, o
           'reading(user_id, status, rating)'
         )
         .eq('group_id', group.id),
-      supabase.from('group_members').select('user_id, joined_at, profiles(display_name)').eq('group_id', group.id),
+      loadMembers(group.id),
     ])
     if (b.error || m.error) {
       const msg = friendlyError(b.error || m.error)
@@ -82,7 +95,7 @@ export default function Library({ group, groups, profile, notice, clearNotice, o
       }
     }
     setBooks(b.data.sort((x, y) => x.title.localeCompare(y.title)))
-    setMembers(m.data.map((r) => ({ id: r.user_id, name: r.profiles?.display_name || 'A friend', joinedAt: r.joined_at })))
+    setMembers(m.data.map((r) => ({ id: r.user_id, name: r.profiles?.display_name || 'A friend', avatar: r.profiles?.avatar || null, joinedAt: r.joined_at })))
   }, [group.id, showToast])
 
   // Initial load + live updates when friends change something.
@@ -98,6 +111,7 @@ export default function Library({ group, groups, profile, notice, clearNotice, o
       .on('postgres_changes', { event: '*', schema: 'public', table: 'queue' }, refresh)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'loans' }, refresh)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'group_members', filter: `group_id=eq.${group.id}` }, refresh)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'profiles' }, refresh)
       .subscribe()
     return () => { clearTimeout(timer); supabase.removeChannel(channel) }
   }, [group.id, load])
@@ -153,6 +167,19 @@ export default function Library({ group, groups, profile, notice, clearNotice, o
       if (rating === null) return Promise.resolve(true)
       return run(supabase.from('reading').upsert({ user_id: me, book_id: bookId, status: 'read', rating, updated_at: new Date().toISOString() }))
     },
+  }
+
+  async function saveAvatar(id) {
+    if (id === profile.avatar) return
+    setSavingAvatar(true)
+    const { data, error } = await supabase.from('profiles').update({ avatar: id }).eq('id', me).select().single()
+    setSavingAvatar(false)
+    if (error) {
+      showToast(/avatar/i.test(error.message || '') ? 'Avatars need the latest database update (update-5.sql).' : friendlyError(error))
+      return
+    }
+    onProfileChange(data)
+    load()
   }
 
   // ----- list view filtering -----
@@ -242,16 +269,35 @@ export default function Library({ group, groups, profile, notice, clearNotice, o
             onClick={() => { focusSearch.current = true; if (view === 'all') searchRef.current?.focus(); else go('all') }}>
             <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="m20 20-4-4" /></svg>
           </button>
+          <button type="button" className="avatar-button" aria-expanded={avatarOpen} aria-controls="avatar-panel"
+            aria-label={profile.avatar ? 'Change your avatar' : 'Choose your avatar'} title={profile.avatar ? 'Change your avatar' : 'Choose your avatar'}
+            onClick={() => setAvatarOpen((v) => !v)}>
+            <AvatarBadge id={profile.avatar} name={profile.display_name} size="md" />
+          </button>
           <AccountMenu profile={profile} onProfileChange={onProfileChange} showToast={showToast} />
         </div>
       </header>
 
-      <GroupBar group={group} groups={groups} members={members} scores={scores} me={me}
+      {avatarOpen && (
+        <section className="avatar-panel" id="avatar-panel" aria-labelledby="avatar-panel-title">
+          <div className="avatar-panel-head">
+            <div>
+              <h2 id="avatar-panel-title">Your shelf object</h2>
+              <p className="muted small">It sits at the end of your shelf and next to your name.</p>
+            </div>
+            <button type="button" className="btn small ghost" onClick={() => setAvatarOpen(false)}>Done</button>
+          </div>
+          <AvatarPicker value={profile.avatar} onChange={saveAvatar} busy={savingAvatar} />
+        </section>
+      )}
+
+      <GroupBar group={group} groups={groups} members={members} scores={scores} me={me} profile={profile}
         person={view === 'home' ? expandedOwner : person} onOpenShelf={openShelf}
         onSwitchGroup={onSwitchGroup} onGroupsChange={onGroupsChange} showToast={showToast} />
 
       {view === 'home' ? (
         <main className="home stack-lg">
+          <h1 className="sr-only">{group.name} bookcase</h1>
           <section className="intro">
             <div>              
               <p>{HOMEPAGE_TEXT}</p>
@@ -270,6 +316,8 @@ export default function Library({ group, groups, profile, notice, clearNotice, o
             members={members}
             me={me}
             myName={profile.display_name}
+            myAvatar={profile.avatar}
+            onChooseAvatar={() => { setAvatarOpen(true); window.scrollTo?.({ top: 0, behavior: prefersReducedMotion() ? 'auto' : 'smooth' }) }}
             nameOf={nameOf}
             selectedCopyId={entry?.copy.id}
             expandedOwner={expandedOwner}
@@ -297,7 +345,7 @@ export default function Library({ group, groups, profile, notice, clearNotice, o
                 onAddBook={() => { setAddOpen(true); window.scrollTo?.({ top: 0 }) }}
               />
             )}
-            <LibraryCard name={profile.display_name} libraryName={group.name} joinedAt={myMember?.joinedAt} score={scores[me]} />
+            <LibraryCard name={profile.display_name} avatar={profile.avatar} libraryName={group.name} joinedAt={myMember?.joinedAt} score={scores[me]} />
           </div>
         </main>
       ) : (
@@ -444,7 +492,7 @@ function BookCard({ book, me, members, nameOf, actions }) {
   )
 }
 
-function GroupBar({ group, groups, members, scores, me, person, onOpenShelf, onSwitchGroup, onGroupsChange, showToast }) {
+function GroupBar({ group, groups, members, scores, me, profile, person, onOpenShelf, onSwitchGroup, onGroupsChange, showToast }) {
   const inviteUrl = `${window.location.origin}${window.location.pathname}?join=${group.invite_code}`
   const [showLink, setShowLink] = useState(false)
   const [creating, setCreating] = useState(false)
@@ -490,6 +538,7 @@ function GroupBar({ group, groups, members, scores, me, person, onOpenShelf, onS
           <li key={m.id}>
             <button type="button" aria-pressed={person === m.id} onClick={() => onOpenShelf(m.id)}
               aria-label={`${m.id === me ? 'You' : m.name}, ${scores[m.id]?.total || 0} points`}>
+              <AvatarBadge id={m.id === me ? profile.avatar : m.avatar} name={m.name} />
               {m.id === me ? 'You' : m.name}
               <span className="pts">{scores[m.id]?.total || 0}</span>
             </button>
