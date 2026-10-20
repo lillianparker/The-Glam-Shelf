@@ -370,7 +370,7 @@ function BookCard({ book, me, members, nameOf, actions }) {
 
       <div className="mine-row">
         <div className="segmented" role="group" aria-label="Your status for this book">
-          {[['want', 'Want to read'], ['reading', 'Reading'], ['read', 'Read'], ['none', 'Neither']].map(([v, label]) => (
+          {[['want', 'Want to read'], ['reading', 'Reading'], ['read', 'Read'], ['none', 'None']].map(([v, label]) => (
             <button key={v} type="button" aria-pressed={mine === v} onClick={() => mine !== v && actions.setMark(book.id, v)}>{label}</button>
           ))}
         </div>
