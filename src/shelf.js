@@ -30,7 +30,15 @@ export function scoreMembers(books, members) {
 
 // ---------- spines ----------
 
-export const SPINE_TONES = ['pink', 'cream', 'wine', 'gold', 'sage', 'blue', 'plum', 'navy', 'forest', 'aubergine', 'cocoa']
+// How often each colour comes up: bigger number = more common.
+// Vibrant tones lead; cream and the dusty blue are the rare ones.
+export const TONE_WEIGHTS = {
+  pink: 3, gold: 3, forest: 3, aubergine: 3,
+  wine: 2, navy: 2, plum: 2, sage: 2, cocoa: 2,
+  cream: 1, blue: 1,
+}
+export const SPINE_TONES = Object.keys(TONE_WEIGHTS)
+const WEIGHTED_TONES = SPINE_TONES.flatMap((t) => Array(TONE_WEIGHTS[t]).fill(t))
 
 // Small stable hash so a copy keeps the same colour and height on every visit.
 function hash(str) {
@@ -42,8 +50,33 @@ function hash(str) {
   return h >>> 0
 }
 
-export function spineTone(copyId) {
-  return SPINE_TONES[hash(String(copyId)) % SPINE_TONES.length]
+// A copy's preferred colour (weighted). `attempt` gives its 2nd, 3rd... choice.
+export function spineTone(copyId, attempt = 0) {
+  const key = attempt ? `${copyId}#${attempt}` : String(copyId)
+  return WEIGHTED_TONES[hash(key) % WEIGHTED_TONES.length]
+}
+
+// Colours for one shelf, in shelf order, so no two neighbours ever match.
+// Each copy gets its preferred colour unless the book before it already has
+// that colour; then it takes its next choice.
+export function shelfTones(items) {
+  const out = {}
+  let prev = null
+  for (const { copy } of items) {
+    let tone = spineTone(copy.id)
+    for (let attempt = 1; tone === prev && attempt < 12; attempt++) tone = spineTone(copy.id, attempt)
+    if (tone === prev) tone = SPINE_TONES.find((t) => t !== prev)
+    out[copy.id] = tone
+    prev = tone
+  }
+  return out
+}
+
+// Colours for every shelf in the library: { copyId: tone }.
+export function bookcaseTones(books) {
+  const owners = new Set()
+  for (const b of books) for (const c of b.copies) owners.add(c.owner_id)
+  return Object.assign({}, ...[...owners].map((o) => shelfTones(shelfCopies(books, o))))
 }
 
 // Height as a fraction of the tallest spine: 0.78 to 1.0.
