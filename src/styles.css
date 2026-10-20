@@ -1,4 +1,4 @@
-/* The Glam Shelf — one reading column: wordmark and circle up top, a big catalog search,
+/* The Glam Shelf â€” one reading column: wordmark and circle up top, a big catalog search,
    then one card per title listing every friend's copy. Berry ink + champagne gold. */
 :root {
   --bg: #fbf5f6;
@@ -224,16 +224,18 @@ details.add summary::-webkit-details-marker { display: none; }
 /* friends' verdicts on a title */
 .verdicts { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 13px; color: var(--muted); }
 .verdicts b { color: var(--ink); font-weight: 600; }
-.v.up::before, .v.meh::before, .v.down::before {
+.v.up::before, .v.good::before, .v.meh::before, .v.down::before {
   display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; content: "";
   vertical-align: 1px;
 }
 .v.up::before { background: var(--accent); }
+.v.good::before { background: color-mix(in srgb, var(--accent) 50%, var(--surface)); }
 .v.meh::before { background: var(--gold); }
 .v.down::before { background: var(--muted); }
 
 .mine-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: flex-end; }
 .segmented { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; overflow: hidden; }
+.segmented.verdict button[aria-pressed="true"].good { background: color-mix(in srgb, var(--accent) 60%, var(--surface)); color: var(--ink); }
 .segmented.verdict button[aria-pressed="true"].meh { background: var(--gold); color: var(--bg); }
 .segmented.verdict button[aria-pressed="true"].down { background: var(--muted); color: var(--bg); }
 
@@ -308,3 +310,31 @@ details.add summary::-webkit-details-marker { display: none; }
   .toast { animation: rise 0.2s ease-out; }
   @keyframes rise { from { opacity: 0; transform: translate(-50%, 8px); } }
 }
+
+/* member chips â†’ each person's shelf */
+.members { list-style: none; margin: 0; padding: 0; flex-basis: 100%; display: flex; flex-wrap: wrap; gap: 6px; }
+.members button {
+  background: var(--surface); border: 1px solid var(--line); border-radius: 999px;
+  padding: 4px 12px; font-size: 13px; font-weight: 500; cursor: pointer;
+}
+.members button:hover { border-color: var(--accent); }
+.members button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+
+.shelf-head { display: flex; flex-direction: column; gap: 10px; }
+.shelf-title { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 14px; }
+.shelf-title h2 { font: italic 500 26px/1.1 var(--f-display); margin: 0; }
+
+/* star: everyone has read it */
+.star {
+  display: inline-block; margin-left: 10px; vertical-align: 0.3em;
+  font: 500 11px var(--f-mono); letter-spacing: 0.06em; text-transform: uppercase;
+  color: var(--gold); background: var(--gold-soft); border: 1px solid var(--gold);
+  border-radius: 999px; padding: 2px 9px; white-space: nowrap;
+}
+
+/* borrowing history */
+.history { display: flex; flex-direction: column; gap: 6px; }
+.history > button { align-self: flex-start; }
+.history-list { list-style: none; margin: 0; padding: 0 0 0 10px; border-left: 2px solid var(--line); display: flex; flex-direction: column; gap: 3px; font-size: 13px; }
+.history-list li { display: flex; flex-wrap: wrap; gap: 4px 10px; }
+.history-list b { font-weight: 600; }
