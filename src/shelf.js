@@ -48,7 +48,7 @@ export function spineTone(copyId) {
 
 // Height as a fraction of the tallest spine: 0.78 to 1.0.
 export function spineHeight(copyId) {
-  return 0.78 + (hash('h' + copyId) % 23) / 100
+  return 0.68 + (hash('h' + copyId) % 23) / 100
 }
 
 // How many spines fit on one shelf row.
