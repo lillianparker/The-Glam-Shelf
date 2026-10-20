@@ -15,6 +15,7 @@ const FILTERS = [
 
 const VERDICTS = [
   ['up', 'Loved it'],
+  ['good', 'It was good'],
   ['meh', 'It was fine'],
   ['down', 'Not for me'],
 ]
@@ -35,6 +36,8 @@ export default function Library({ group, groups, profile, notice, clearNotice, o
   const [members, setMembers] = useState([])
   const [query, setQuery] = useState('')
   const [filter, setFilter] = useState('all')
+  const [person, setPerson] = useState(null)       // whose shelf we're looking at
+  const [personTab, setPersonTab] = useState('owns')
   const [toast, setToast] = useState('')
   const toastTimer = useRef()
 
@@ -52,7 +55,7 @@ export default function Library({ group, groups, profile, notice, clearNotice, o
         .from('books')
         .select(
           'id, title, author, ' +
-          'copies(id, owner_id, status, lendable, lent_to_user, lent_to_name, lent_at, created_at, queue(user_id, sort_key, joined_at)), ' +
+          'copies(id, owner_id, status, lendable, lent_to_user, lent_to_name, lent_at, created_at, queue(user_id, sort_key, joined_at), loans(id, borrower_id, borrower_name, lent_at, returned_at)), ' +
           'reading(user_id, status, rating)'
         )
         .eq('group_id', group.id),
@@ -62,6 +65,7 @@ export default function Library({ group, groups, profile, notice, clearNotice, o
     for (const book of b.data) {
       for (const c of book.copies) {
         c.queue.sort((x, y) => x.sort_key - y.sort_key || x.joined_at.localeCompare(y.joined_at))
+        c.loans = (c.loans || []).sort((x, y) => y.lent_at.localeCompare(x.lent_at))
         c.book = { id: book.id, title: book.title }
       }
     }
@@ -80,6 +84,7 @@ export default function Library({ group, groups, profile, notice, clearNotice, o
       .on('postgres_changes', { event: '*', schema: 'public', table: 'copies' }, refresh)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'reading' }, refresh)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'queue' }, refresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'loans' }, refresh)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'group_members', filter: `group_id=eq.${group.id}` }, refresh)
       .subscribe()
     return () => { clearTimeout(timer); supabase.removeChannel(channel) }
@@ -145,7 +150,19 @@ export default function Library({ group, groups, profile, notice, clearNotice, o
   const all = books || []
   const counts = Object.fromEntries(FILTERS.map(([k]) => [k, all.filter(tests[k]).length]))
   const q = query.trim().toLowerCase()
-  const visible = all.filter(tests[filter]).filter((b) => !q || `${b.title} ${b.author}`.toLowerCase().includes(q))
+  const markOf = (b, uid) => b.reading.find((r) => r.user_id === uid)
+  const personTests = {
+    owns: (b) => b.copies.some((c) => c.owner_id === person),
+    reading: (b) => markOf(b, person)?.status === 'reading',
+    read: (b) => markOf(b, person)?.status === 'read',
+    want: (b) => markOf(b, person)?.status === 'want',
+    has: (b) => b.copies.some((c) => c.lent_to_user === person),
+  }
+  const personCounts = person ? Object.fromEntries(Object.keys(personTests).map((k) => [k, all.filter(personTests[k]).length])) : {}
+  const visible = all
+    .filter(person ? personTests[personTab] : tests[filter])
+    .filter((b) => !q || `${b.title} ${b.author}`.toLowerCase().includes(q))
+  const openShelf = (uid) => { setPerson(uid); setPersonTab('owns'); window.scrollTo({ top: 0, behavior: 'smooth' }) }
 
   return (
     <div className="page">
@@ -154,7 +171,7 @@ export default function Library({ group, groups, profile, notice, clearNotice, o
           <Wordmark />
           <AccountMenu profile={profile} onProfileChange={onProfileChange} showToast={showToast} />
         </div>
-        <GroupBar group={group} groups={groups} members={members} onSwitchGroup={onSwitchGroup} onGroupsChange={onGroupsChange} showToast={showToast} />
+        <GroupBar group={group} groups={groups} members={members} me={me} person={person} onOpenShelf={openShelf} onSwitchGroup={onSwitchGroup} onGroupsChange={onGroupsChange} showToast={showToast} />
       </header>
 
       <main className="stack-lg">
@@ -171,13 +188,29 @@ export default function Library({ group, groups, profile, notice, clearNotice, o
           autoComplete="off"
         />
 
-        <div className="filters" role="group" aria-label="Filter books">
-          {FILTERS.map(([k, label]) => (
-            <button key={k} type="button" aria-pressed={filter === k} onClick={() => setFilter(k)}>
-              {label}<span className="count">{counts[k]}</span>
-            </button>
-          ))}
-        </div>
+        {person ? (
+          <div className="shelf-head">
+            <div className="shelf-title">
+              <h2>{person === me ? 'Your shelf' : `${nameOf(person)}'s shelf`}</h2>
+              <button type="button" className="linkish small" onClick={() => setPerson(null)}>Back to all books</button>
+            </div>
+            <div className="filters" role="group" aria-label="Filter this shelf">
+              {[['owns', 'Owns'], ['reading', 'Reading'], ['read', 'Has read'], ['want', 'Wants to read'], ['has', 'Borrowing now']].map(([k, label]) => (
+                <button key={k} type="button" aria-pressed={personTab === k} onClick={() => setPersonTab(k)}>
+                  {label}<span className="count">{personCounts[k]}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <div className="filters" role="group" aria-label="Filter books">
+            {FILTERS.map(([k, label]) => (
+              <button key={k} type="button" aria-pressed={filter === k} onClick={() => setFilter(k)}>
+                {label}<span className="count">{counts[k]}</span>
+              </button>
+            ))}
+          </div>
+        )}
 
         <AddBook onAdd={actions.addCopy} />
 
@@ -188,7 +221,7 @@ export default function Library({ group, groups, profile, notice, clearNotice, o
             <Empty title="The shelf is empty">Add the first book you own with “+ Add a book you own” above, then send friends the invite link.</Empty>
           ) : visible.length === 0 ? (
             q ? <Empty title={`No one has “${query.trim()}”`}>Check the spelling, or try the author's name.</Empty>
-              : <Empty title="Nothing here yet">Try a different filter.</Empty>
+              : <Empty title="Nothing here yet">{person ? 'Nothing in this part of their shelf yet.' : 'Try a different filter.'}</Empty>
           ) : (
             visible.map((b) => (
               <BookCard key={b.id} book={b} me={me} members={members} nameOf={nameOf} actions={actions} />
@@ -295,6 +328,7 @@ function BookCard({ book, me, members, nameOf, actions }) {
   const wanters = who((r) => r.status === 'want')
   const readingNow = who((r) => r.status === 'reading')
   const loved = who((r) => r.rating === 'up')
+  const good = who((r) => r.rating === 'good')
   const fine = who((r) => r.rating === 'meh')
   const notFor = who((r) => r.rating === 'down')
   const readNoVerdict = who((r) => r.status === 'read' && !r.rating)
@@ -303,17 +337,23 @@ function BookCard({ book, me, members, nameOf, actions }) {
   const myRating = myRow?.rating || null
   const copies = [...book.copies].sort((a, b) => (b.owner_id === me) - (a.owner_id === me) || a.created_at.localeCompare(b.created_at))
   const names = (ids) => joinNames(ids.map(nameOf))
+  const readIds = new Set(book.reading.filter((r) => r.status === 'read').map((r) => r.user_id))
+  const starred = members.length >= 2 && members.every((m) => readIds.has(m.id))
 
   return (
     <article className="card">
       <div>
-        <h2 className="title">{book.title}</h2>
+        <h2 className="title">
+          {book.title}
+          {starred && <span className="star" title="Everyone in the library has read this">★ Read by everyone</span>}
+        </h2>
         {book.author && <p className="author">{book.author}</p>}
       </div>
 
-      {(loved.length > 0 || fine.length > 0 || notFor.length > 0 || readNoVerdict.length > 0 || readingNow.length > 0 || wanters.length > 0) && (
+      {(loved.length > 0 || good.length > 0 || fine.length > 0 || notFor.length > 0 || readNoVerdict.length > 0 || readingNow.length > 0 || wanters.length > 0) && (
         <div className="verdicts">
           {loved.length > 0 && <span className="v up">Loved by <b>{names(loved)}</b></span>}
+          {good.length > 0 && <span className="v good">Liked by <b>{names(good)}</b></span>}
           {fine.length > 0 && <span className="v meh">Fine for <b>{names(fine)}</b></span>}
           {notFor.length > 0 && <span className="v down">Not for <b>{names(notFor)}</b></span>}
           {readNoVerdict.length > 0 && <span className="v">Read by <b>{names(readNoVerdict)}</b></span>}
@@ -353,6 +393,9 @@ function CopyRow({ copy, me, members, nameOf, actions }) {
   const [confirming, setConfirming] = useState(null) // 'remove' | 'stop'
   const [otherOpen, setOtherOpen] = useState(false)
   const [otherName, setOtherName] = useState(copy.lent_to_name || '')
+  const [showHistory, setShowHistory] = useState(false)
+  const loans = copy.loans
+  const pastLoans = loans.filter((l) => l.returned_at)
 
   const line = copy.queue
   const next = line[0]?.user_id
@@ -450,6 +493,24 @@ function CopyRow({ copy, me, members, nameOf, actions }) {
         </ol>
       )}
 
+      {loans.length > 0 && (
+        <div className="history">
+          <button type="button" className="linkish small muted" aria-expanded={showHistory} onClick={() => setShowHistory((v) => !v)}>
+            {showHistory ? 'Hide history' : `Borrowing history · ${pastLoans.length === 0 ? 'first time out' : `lent ${loans.length} ${loans.length === 1 ? 'time' : 'times'}`}`}
+          </button>
+          {showHistory && (
+            <ol className="history-list">
+              {loans.map((l) => (
+                <li key={l.id}>
+                  <b>{l.borrower_id ? nameOf(l.borrower_id) : l.borrower_name || 'A friend'}</b>
+                  <span className="muted">{fmtDate(l.lent_at)} – {l.returned_at ? fmtDate(l.returned_at) : 'now'}</span>
+                </li>
+              ))}
+            </ol>
+          )}
+        </div>
+      )}
+
       {isOwner && (
         <div className="owner-tools">
           {confirming === 'stop' ? (
@@ -479,7 +540,7 @@ function CopyRow({ copy, me, members, nameOf, actions }) {
   )
 }
 
-function GroupBar({ group, groups, members, onSwitchGroup, onGroupsChange, showToast }) {
+function GroupBar({ group, groups, members, me, person, onOpenShelf, onSwitchGroup, onGroupsChange, showToast }) {
   const inviteUrl = `${window.location.origin}${window.location.pathname}?join=${group.invite_code}`
   const [showLink, setShowLink] = useState(false)
   const [creating, setCreating] = useState(false)
@@ -513,12 +574,20 @@ function GroupBar({ group, groups, members, onSwitchGroup, onGroupsChange, showT
         ) : (
           <span className="gname">{group.name}</span>
         )}
-        <span className="muted small">{members.length} {members.length === 1 ? 'member' : 'members'}</span>
       </div>
       <div className="group-actions">
         <button type="button" className="btn small" onClick={copy}>Copy invite link</button>
         <button type="button" className="btn small ghost" onClick={() => setCreating((v) => !v)}>New library</button>
       </div>
+      <ul className="members" aria-label="Members">
+        {[...members].sort((a, b) => (b.id === me) - (a.id === me) || a.name.localeCompare(b.name)).map((m) => (
+          <li key={m.id}>
+            <button type="button" aria-pressed={person === m.id} onClick={() => onOpenShelf(m.id)}>
+              {m.id === me ? 'You' : m.name}
+            </button>
+          </li>
+        ))}
+      </ul>
       {showLink && (
         <div className="linkbox">
           <span className="muted small">Copy this link and send it to a friend:</span>
