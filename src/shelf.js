@@ -30,7 +30,7 @@ export function scoreMembers(books, members) {
 
 // ---------- spines ----------
 
-export const SPINE_TONES = ['pink', 'cream', 'wine', 'gold', 'sage', 'blue', 'plum']
+export const SPINE_TONES = ['pink', 'cream', 'wine', 'gold', 'sage', 'blue', 'plum', 'navy', 'forest', 'aubergine', 'cocoa']
 
 // Small stable hash so a copy keeps the same colour and height on every visit.
 function hash(str) {
