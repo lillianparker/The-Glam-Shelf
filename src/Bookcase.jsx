@@ -99,7 +99,7 @@ export default function Bookcase({ books, members, me, myName, myAvatar, onChoos
           <h2 id="bookcase-title">Friends’ shelves</h2>
         </div>
         <div className="bookcase-head-actions">
-          <span className="legend"><i className="legend-ribbon" aria-hidden="true" />Out on loan</span>
+          <span className="legend"><i className="legend-ribbon" aria-hidden="true" />Out on loan or being read</span>
           <span className="book-count">{total} {total === 1 ? 'book' : 'books'} in this library</span>
         </div>
       </div>
@@ -211,11 +211,16 @@ function FullShelf({ items, me, nameOf, selectedCopyId, onOpenCopy, ownerName, d
 export function Spine({ copy, book, me, nameOf, ownerName, selected, onOpen, tone }) {
   const where = availabilityText(copy, me, nameOf)
   const out = copy.status === 'lent'
-  const label = `${book.title}${book.author ? ` by ${book.author}` : ''}. ${possessive(ownerName)} copy. ${where}.`
+  // Whoever has this copy right now (the borrower, or the owner when it's at home)
+  // has marked the book as Reading.
+  const holder = out ? copy.lent_to_user : copy.owner_id
+  const beingRead = Boolean(holder) && (book.reading || []).some((r) => r.user_id === holder && r.status === 'reading')
+  const ribbon = out || beingRead
+  const label = `${book.title}${book.author ? ` by ${book.author}` : ''}. ${possessive(ownerName)} copy. ${where}.${beingRead ? ` Being read by ${holder === me ? 'you' : nameOf(holder)}.` : ''}`
   return (
     <button
       type="button"
-      className={`spine tone-${tone || spineTone(copy.id)}${selected ? ' selected' : ''}${out ? ' out' : ''}`}
+      className={`spine tone-${tone || spineTone(copy.id)}${selected ? ' selected' : ''}${ribbon ? ' out' : ''}`}
       style={{ '--h': spineHeight(copy.id) }}
       aria-label={label}
       aria-pressed={selected}
@@ -224,7 +229,7 @@ export function Spine({ copy, book, me, nameOf, ownerName, selected, onOpen, ton
     >
       <span className="spine-title">{book.title}</span>
       {book.author && <small className="spine-author">{book.author.split(' ').slice(-1)[0]}</small>}
-      {out && <i className="spine-ribbon" aria-hidden="true" />}
+      {ribbon && <i className="spine-ribbon" aria-hidden="true" />}
     </button>
   )
 }
