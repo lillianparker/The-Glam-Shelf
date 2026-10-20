@@ -1,8 +1,8 @@
 // The homepage bookcase: one shelf row per member, each copy a spine.
-import { useLayoutEffect, useRef, useState } from 'react'
+import { useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { ShelfObject } from './AvatarPicker.jsx'
 import { findAvatar } from './avatars.js'
-import { availabilityText, chunkRows, fitCount, possessive, shelfCopies, spineHeight, spineTone } from './shelf.js'
+import { availabilityText, bookcaseTones, chunkRows, fitCount, possessive, shelfCopies, spineHeight, spineTone } from './shelf.js'
 
 // Fallback sizes (px) if the CSS custom properties can't be read.
 const DEFAULT_SIZES = { spine: 52, gap: 6, more: 48 }
@@ -39,6 +39,7 @@ function useWidth() {
 }
 
 export default function Bookcase({ books, members, me, myName, myAvatar, onChooseAvatar, nameOf, selectedCopyId, expandedOwner, onOpenCopy, onExpand, onCollapse, onViewList, loading, error, onRetry }) {
+  const tones = useMemo(() => bookcaseTones(books || []), [books])
   if (error && !books) {
     return (
       <section className="bookcase" aria-label="Bookcase">
@@ -84,7 +85,7 @@ export default function Bookcase({ books, members, me, myName, myAvatar, onChoos
             <button type="button" className="btn small ghost" onClick={onCollapse}>Back to the bookcase</button>
           </div>
         </div>
-        <FullShelf items={items} me={me} nameOf={nameOf} selectedCopyId={selectedCopyId} onOpenCopy={onOpenCopy} ownerName={label(expandedOwner)}
+        <FullShelf items={items} me={me} nameOf={nameOf} selectedCopyId={selectedCopyId} onOpenCopy={onOpenCopy} ownerName={label(expandedOwner)} tones={tones}
           deco={decoFor(expandedOwner)} />
       </section>
     )
@@ -113,6 +114,7 @@ export default function Bookcase({ books, members, me, myName, myAvatar, onChoos
           selectedCopyId={selectedCopyId}
           onOpenCopy={onOpenCopy}
           onExpand={() => onExpand(m.id)}
+          tones={tones}
           deco={decoFor(m.id)}
         />
       ))}
@@ -120,7 +122,7 @@ export default function Bookcase({ books, members, me, myName, myAvatar, onChoos
   )
 }
 
-export function ShelfRow({ ownerId, ownerName, items, me, nameOf, selectedCopyId, onOpenCopy, onExpand, deco = null }) {
+export function ShelfRow({ ownerId, ownerName, items, me, nameOf, selectedCopyId, onOpenCopy, onExpand, deco = null, tones }) {
   const [ref, width, sizes] = useWidth()
   const shown = fitCount(width, items.length, sizes)
   const hidden = items.length - shown
@@ -140,7 +142,7 @@ export function ShelfRow({ ownerId, ownerName, items, me, nameOf, selectedCopyId
             <ul className="spine-list">
               {items.slice(0, shown).map(({ copy, book }) => (
                 <li key={copy.id}>
-                  <Spine copy={copy} book={book} me={me} nameOf={nameOf} ownerName={ownerName} selected={copy.id === selectedCopyId} onOpen={onOpenCopy} />
+                  <Spine copy={copy} book={book} me={me} nameOf={nameOf} ownerName={ownerName} selected={copy.id === selectedCopyId} onOpen={onOpenCopy} tone={tones?.[copy.id]} />
                 </li>
               ))}
             </ul>
@@ -177,7 +179,7 @@ export function ShelfDeco({ avatar, isMe, onChoose }) {
   return null
 }
 
-function FullShelf({ items, me, nameOf, selectedCopyId, onOpenCopy, ownerName, deco = null }) {
+function FullShelf({ items, me, nameOf, selectedCopyId, onOpenCopy, ownerName, deco = null, tones }) {
   const [ref, width, sizes] = useWidth()
   const rows = chunkRows(items, width, sizes)
   return (
@@ -193,7 +195,7 @@ function FullShelf({ items, me, nameOf, selectedCopyId, onOpenCopy, ownerName, d
             <ul className="spine-list">
               {row.map(({ copy, book }) => (
                 <li key={copy.id}>
-                  <Spine copy={copy} book={book} me={me} nameOf={nameOf} ownerName={ownerName} selected={copy.id === selectedCopyId} onOpen={onOpenCopy} />
+                  <Spine copy={copy} book={book} me={me} nameOf={nameOf} ownerName={ownerName} selected={copy.id === selectedCopyId} onOpen={onOpenCopy} tone={tones?.[copy.id]} />
                 </li>
               ))}
             </ul>
@@ -206,14 +208,14 @@ function FullShelf({ items, me, nameOf, selectedCopyId, onOpenCopy, ownerName, d
   )
 }
 
-export function Spine({ copy, book, me, nameOf, ownerName, selected, onOpen }) {
+export function Spine({ copy, book, me, nameOf, ownerName, selected, onOpen, tone }) {
   const where = availabilityText(copy, me, nameOf)
   const out = copy.status === 'lent'
   const label = `${book.title}${book.author ? ` by ${book.author}` : ''}. ${possessive(ownerName)} copy. ${where}.`
   return (
     <button
       type="button"
-      className={`spine tone-${spineTone(copy.id)}${selected ? ' selected' : ''}${out ? ' out' : ''}`}
+      className={`spine tone-${tone || spineTone(copy.id)}${selected ? ' selected' : ''}${out ? ' out' : ''}`}
       style={{ '--h': spineHeight(copy.id) }}
       aria-label={label}
       aria-pressed={selected}
