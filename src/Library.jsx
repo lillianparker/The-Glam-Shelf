@@ -255,7 +255,7 @@ export default function Library({ group, groups, profile, notice, clearNotice, o
           <section className="intro">
             <div>
               <span className="eyebrow">{group.name}</span>
-              <h1>{HOMEPAGE_HEADLINE}</h1>
+              
               <p>{HOMEPAGE_TEXT}</p>
             </div>
             <button type="button" className="btn primary" aria-expanded={addOpen} onClick={() => setAddOpen((v) => !v)}>
