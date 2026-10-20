@@ -4,7 +4,7 @@ import { supabase, friendlyError } from './supabase.js'
 import { CopyRow, ReadingControls, Verdicts, fmtDate, isStarred } from './parts.jsx'
 import { availabilityText, libraryLog, possessive, spineTone } from './shelf.js'
 
-const BookListing = forwardRef(function BookListing({ entry, me, myName, members, nameOf, actions, showToast, onAddBook }, headingRef) {
+const BookListing = forwardRef(function BookListing({ entry, tone, me, myName, members, nameOf, actions, showToast, onAddBook }, headingRef) {
   const [tab, setTab] = useState('comments')
   const tabsRef = useRef([])
   const copyId = entry?.copy.id
@@ -43,7 +43,7 @@ const BookListing = forwardRef(function BookListing({ entry, me, myName, members
 
   return (
     <article className="listing" aria-labelledby="listing-title">
-      <BookCover title={book.title} author={book.author} tone={spineTone(copy.id)} />
+      <BookCover title={book.title} author={book.author} tone={tone || spineTone(copy.id)} />
       <div className="book-copy">
         <span className="eyebrow">{isOwner ? 'From your shelf' : `From ${possessive(ownerName)} shelf`}</span>
         <h2 id="listing-title" ref={headingRef} tabIndex={-1}>
