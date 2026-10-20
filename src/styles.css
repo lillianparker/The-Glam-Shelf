@@ -24,6 +24,7 @@
 
   /* spine + cover tones: the same in light and dark */
   --sp-pink: #ec8db1;
+  --sp-cream: #f7ead3;
   --sp-wine: #6d2941;
   --sp-gold: #d6b665;
   --sp-sage: #9db590;
@@ -542,6 +543,7 @@ svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width:
 
 /* tones (spines + covers) */
 .tone-pink  { background: var(--sp-pink);  color: var(--sp-ink); }
+.tone-cream { background: var(--sp-cream); color: var(--sp-ink); }
 .tone-wine  { background: var(--sp-wine);  color: var(--sp-paper); }
 .tone-gold  { background: var(--sp-gold);  color: var(--sp-ink); }
 .tone-sage  { background: var(--sp-sage);  color: var(--sp-ink); }
