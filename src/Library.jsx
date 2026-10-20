@@ -253,9 +253,7 @@ export default function Library({ group, groups, profile, notice, clearNotice, o
       {view === 'home' ? (
         <main className="home stack-lg">
           <section className="intro">
-            <div>
-              <span className="eyebrow">{group.name}</span>
-              
+            <div>              
               <p>{HOMEPAGE_TEXT}</p>
             </div>
             <button type="button" className="btn primary" aria-expanded={addOpen} onClick={() => setAddOpen((v) => !v)}>
