@@ -110,7 +110,7 @@ export default BookListing
 export function BookCover({ title, author, tone }) {
   return (
     <div className={`cover tone-${tone}`} aria-hidden="true">
-      <span>THE GLAM SHELF</span>
+      <span>GLAM BOOKSHELF</span>
       <strong>{title}</strong>
       {author && <i>by {author}</i>}
     </div>

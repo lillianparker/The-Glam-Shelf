@@ -11,12 +11,12 @@
 export const TUNING = {
   FIELD: 1000,          // width of the play area, in units
   START_WIDTH: 560,     // width of the first books
-  START_SPEED: 200,     // how fast the book slides at first (units per second); lower is slower
+  START_SPEED: 185,     // how fast the book slides at first (units per second); lower is slower
   SPEED_UP: 1.015,      // each book is this much faster than the last (1.015 = 1.5% faster)
   MAX_SPEED: 420,       // it never gets faster than this
   PERFECT_WITHIN: 10,   // a drop this close (in units) to the book below counts as perfect
   PERFECT_GROW: 40,     // a perfect drop grows the book back by this much
-  SWING: 270,           // how far past the stack the sliding book travels on each side; bigger = wider swing, harder to just tap Space
+  SWING: 260,           // how far past the stack the sliding book travels on each side; bigger = wider swing, harder to just tap Space
   CLEAR: 12,            // it always goes at least this far past the stack, so a total miss is always possible
   EDGE_SHOW: 20,        // ...but never so far that it disappears off the edge of the screen
 }
@@ -46,7 +46,7 @@ export function travelRange(width, top, t = TUNING) {
 
 // A new game: one book already on the base, the next one about to slide in.
 export function newGame(titles, random = Math.random, t = TUNING) {
-  const first = { x: (t.FIELD - t.START_WIDTH) / 2, w: t.START_WIDTH, title: titles[0] || 'The Glam Shelf', tone: 0 }
+  const first = { x: (t.FIELD - t.START_WIDTH) / 2, w: t.START_WIDTH, title: titles[0] || 'Glam Bookshelf', tone: 0 }
   return {
     status: 'ready',      // 'ready' → 'playing' (⇄ 'paused') → 'over'
     titles,
@@ -67,7 +67,7 @@ function spawn(width, top, n, titles, t = TUNING) {
     x: fromLeft ? range.min : range.max,
     w: width,
     dir: fromLeft ? 1 : -1,
-    title: titles.length ? titles[n % titles.length] : 'The Glam Shelf',
+    title: titles.length ? titles[n % titles.length] : 'Glam Bookshelf',
     tone: n,
   }
 }

@@ -1,4 +1,4 @@
-/* The Glam Shelf — a bookcase homepage (one shelf per friend, a spine per copy),
+/* Glam Bookshelf — a bookcase homepage (one shelf per friend, a spine per copy),
    the listing for the picked copy beside a library card, and an "All books" list. */
 /* Tokens. Warm paper + cream surfaces, berry ink for actions, and an illustrated
    bookcase palette (pink, cream, wine, muted gold, sage, blue, plum) for spines and covers. */
@@ -79,7 +79,6 @@ code { font-family: var(--f-mono); font-size: 0.9em; }
   letter-spacing: -0.02em;
   margin: 0;
 }
-.wordmark .the { font-size: 0.55em; font-style: italic; color: var(--muted); vertical-align: 0.35em; }
 .wordmark em {
   font-style: italic;
   color: var(--accent);
