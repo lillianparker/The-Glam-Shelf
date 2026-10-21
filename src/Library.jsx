@@ -73,7 +73,7 @@ export default function Library({ group, groups, profile, notice, clearNotice, o
         .from('books')
         .select(
           'id, title, author, ' +
-          'copies(id, owner_id, status, lendable, lent_to_user, lent_to_name, lent_at, created_at, queue(user_id, sort_key, joined_at), loans(id, borrower_id, borrower_name, lent_at, returned_at)), ' +
+          'copies(id, owner_id, status, lendable, lent_to_user, lent_to_name, lent_at, created_at, item_id, everywhere, queue(user_id, sort_key, joined_at), loans(id, borrower_id, borrower_name, lent_at, returned_at)), ' +
           'reading(user_id, status, rating)'
         )
         .eq('group_id', group.id),
@@ -118,7 +118,8 @@ export default function Library({ group, groups, profile, notice, clearNotice, o
 
   const nameOf = useMemo(() => {
     const map = Object.fromEntries(members.map((m) => [m.id, m.name]))
-    return (id) => (id === me ? 'You' : map[id] || 'A former member')
+    // someone not in this library (a friend from another library, or someone who left)
+    return (id) => (id === me ? 'You' : map[id] || 'A friend')
   }, [members, me])
 
   async function run(promise, okMsg) {
@@ -130,8 +131,24 @@ export default function Library({ group, groups, profile, notice, clearNotice, o
   }
 
   const actions = {
-    addCopy: (title, author) =>
-      run(supabase.rpc('add_copy', { gid: group.id, book_title: title, book_author: author }), `Added “${title}”`),
+    addCopy: async (title, author, everywhere = false) => {
+      let res = await supabase.rpc('add_copy', { gid: group.id, book_title: title, book_author: author, everywhere })
+      if (res.error && /add_copy|function/i.test(res.error.message || '')) {
+        // database not updated yet (update-6.sql): add it to this library only
+        res = await supabase.rpc('add_copy', { gid: group.id, book_title: title, book_author: author })
+        if (!res.error && everywhere) { showToast(`Added “${title}” here. Showing books in all libraries needs update-6.sql.`); load(); return true }
+      }
+      return run(Promise.resolve(res), everywhere && groups.length > 1 ? `Added “${title}” to all your libraries` : `Added “${title}”`)
+    },
+    setEverywhere: (copy, on) =>
+      run(supabase.rpc('set_everywhere', { cid: copy.id, on_: on }), on ? 'Now in all your libraries' : 'Now only in this library'),
+    setAllEverywhere: async () => {
+      const { data, error } = await supabase.rpc('set_all_everywhere', { gid: group.id, on_: true })
+      if (error) { showToast(/set_all_everywhere|function/i.test(error.message || '') ? 'This needs the latest database update (update-6.sql).' : friendlyError(error)); return false }
+      showToast(data ? `${data} ${data === 1 ? 'book is' : 'books are'} now in all your libraries` : 'All your books were already in all your libraries')
+      load()
+      return true
+    },
     setHome: (copy) =>
       run(supabase.from('copies').update({ status: 'home', lent_to_user: null, lent_to_name: null, lent_at: null }).eq('id', copy.id), 'Back on the shelf'),
     lendTo: (copy, userId) =>
@@ -326,6 +343,8 @@ export default function Library({ group, groups, profile, notice, clearNotice, o
             onExpand={setExpandedOwner}
             onCollapse={() => setExpandedOwner(null)}
             onViewList={(uid) => go('all', { person: uid })}
+            onShareAll={actions.setAllEverywhere}
+            libraryCount={groups.length}
             loading={books === null && !loadError}
             error={loadError}
             onRetry={load}

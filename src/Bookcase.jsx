@@ -38,7 +38,7 @@ function useWidth() {
   return [ref, state.width, state.sizes]
 }
 
-export default function Bookcase({ books, members, me, myName, myAvatar, onChooseAvatar, nameOf, selectedCopyId, expandedOwner, onOpenCopy, onExpand, onCollapse, onViewList, loading, error, onRetry }) {
+export default function Bookcase({ books, members, me, myName, myAvatar, onChooseAvatar, nameOf, selectedCopyId, expandedOwner, onOpenCopy, onExpand, onCollapse, onViewList, onShareAll, libraryCount = 1, loading, error, onRetry }) {
   const tones = useMemo(() => bookcaseTones(books || []), [books])
   if (error && !books) {
     return (
@@ -82,6 +82,12 @@ export default function Bookcase({ books, members, me, myName, myAvatar, onChoos
           <div className="bookcase-head-actions">
             <span className="book-count">{items.length} {items.length === 1 ? 'book' : 'books'}</span>
             <button type="button" className="linkish small" onClick={() => onViewList(expandedOwner)}>View as a list</button>
+            {expandedOwner === me && onShareAll && items.some(({ copy }) => !copy.everywhere) && (
+              <button type="button" className="btn small" onClick={onShareAll}
+                title={libraryCount > 1 ? 'Show every book on this shelf in all your libraries' : 'Your books will follow you into libraries you join later'}>
+                Put all my books in every library
+              </button>
+            )}
             <button type="button" className="btn small ghost" onClick={onCollapse}>Back to the bookcase</button>
           </div>
         </div>

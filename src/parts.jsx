@@ -123,6 +123,7 @@ export function ReadingControls({ book, me, actions, layout = 'compact' }) {
 }
 
 export function AddBook({ onAdd, open: openProp, onOpenChange }) {
+  const [everywhere, setEverywhere] = useState(true)
   const [openState, setOpenState] = useState(false)
   const open = openProp ?? openState
   const setOpen = (v) => { setOpenState(v); onOpenChange?.(v) }
@@ -135,7 +136,7 @@ export function AddBook({ onAdd, open: openProp, onOpenChange }) {
     e.preventDefault()
     if (!title.trim()) return
     setBusy(true)
-    const ok = await onAdd(title.trim(), author.trim())
+    const ok = await onAdd(title.trim(), author.trim(), everywhere)
     setBusy(false)
     if (ok) { setTitle(''); setAuthor(''); titleRef.current?.focus() }
   }
@@ -153,6 +154,10 @@ export function AddBook({ onAdd, open: openProp, onOpenChange }) {
           <input id="add-author" maxLength={200} value={author} onChange={(e) => setAuthor(e.target.value)} />
         </label>
         <button className="btn" disabled={busy || !title.trim()}>Add to shelf</button>
+        <label className="check add-everywhere" htmlFor="add-everywhere">
+          <input id="add-everywhere" type="checkbox" checked={everywhere} onChange={(e) => setEverywhere(e.target.checked)} />
+          <span>Show it in all my libraries <em>(including ones I join later)</em></span>
+        </label>
       </form>
     </details>
   )
@@ -318,7 +323,7 @@ export function CopyRow({ copy, me, members, nameOf, actions, compact = false, h
             </form>
           ) : confirming === 'remove' ? (
             <>
-              <span className="small">Remove your copy from the shelf?</span>
+              <span className="small">{copy.everywhere ? 'Remove your copy from all your libraries?' : 'Remove your copy from the shelf?'}</span>
               <button type="button" className="btn small danger" onClick={() => actions.removeCopy(copy)}>Yes, remove</button>
               <button type="button" className="btn small ghost" onClick={() => setConfirming(null)}>Keep</button>
             </>
@@ -328,6 +333,11 @@ export function CopyRow({ copy, me, members, nameOf, actions, compact = false, h
                 onClick={() => copy.lendable ? (line.length ? setConfirming('stop') : actions.setLendable(copy, false)) : actions.setLendable(copy, true)}>
                 {copy.lendable ? 'Not lending this one' : 'Start lending again'}
               </button>
+              <label className="check small" htmlFor={`everywhere-${copy.id}`}>
+                <input id={`everywhere-${copy.id}`} type="checkbox" checked={Boolean(copy.everywhere)}
+                  onChange={(e) => actions.setEverywhere(copy, e.target.checked)} />
+                <span>In all my libraries</span>
+              </label>
               <button type="button" className="linkish small" onClick={() => { setEditTitle(copy.book.title); setEditAuthor(copy.book.author || ''); setConfirming('edit') }}>Edit title or author</button>
               <button type="button" className="linkish small muted" onClick={() => setConfirming('remove')}>Remove</button>
             </>

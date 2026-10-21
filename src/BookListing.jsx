@@ -28,7 +28,7 @@ const BookListing = forwardRef(function BookListing({ entry, tone, me, myName, m
   const ownerName = isOwner ? myName : nameOf(copy.owner_id)
   const where = availabilityText(copy, me, nameOf)
   const tabs = [
-    ['comments', `${possessive(ownerName)} comments`],
+    ['comments', 'Thoughts on this book'],
     ['log', 'Library log'],
   ]
 
@@ -43,7 +43,10 @@ const BookListing = forwardRef(function BookListing({ entry, tone, me, myName, m
 
   return (
     <article className="listing" aria-labelledby="listing-title">
-      <BookCover title={book.title} author={book.author} tone={tone || spineTone(copy.id)} />
+      <div className="cover-col">
+        <BookCover title={book.title} author={book.author} tone={tone || spineTone(copy.id)} />
+        <Comments copy={copy} me={me} isOwner={isOwner} nameOf={nameOf} myName={myName} showToast={showToast} />
+      </div>
       <div className="book-copy">
         <span className="eyebrow">{isOwner ? 'From your shelf' : `From ${possessive(ownerName)} shelf`}</span>
         <h2 id="listing-title" ref={headingRef} tabIndex={-1}>
@@ -91,7 +94,6 @@ const BookListing = forwardRef(function BookListing({ entry, tone, me, myName, m
             <Verdicts book={book} nameOf={nameOf} />
             <ReadingControls book={book} me={me} actions={actions} layout="labeled" />
 
-            <Comments copy={copy} me={me} isOwner={isOwner} nameOf={nameOf} myName={myName} showToast={showToast} />
           </div>
         ) : (
           <div className="log-panel" role="tabpanel" id="panel-log" aria-labelledby="tab-log">
@@ -132,13 +134,16 @@ export function LibraryLog({ copy, nameOf }) {
   )
 }
 
-// Comments on one copy, saved in the `comments` table (update-4.sql).
+// Comments on one copy, shown as notes "in the margins" under the cover.
+// Saved in the `comments` table (update-4.sql).
 export function Comments({ copy, me, isOwner, nameOf, myName, showToast }) {
   const [items, setItems] = useState(null)
   const [missing, setMissing] = useState(false)
   const [body, setBody] = useState('')
   const [busy, setBusy] = useState(false)
   const [confirmId, setConfirmId] = useState(null)
+  const [open, setOpen] = useState(() => { try { return localStorage.getItem('glam_margins_open') === '1' } catch { return false } })
+  const toggle = (v) => { setOpen(v); try { localStorage.setItem('glam_margins_open', v ? '1' : '0') } catch { /* private mode */ } }
 
   const load = useCallback(async () => {
     const { data, error } = await supabase
@@ -185,50 +190,61 @@ export function Comments({ copy, me, isOwner, nameOf, myName, showToast }) {
     load()
   }
 
-  if (missing) {
-    return <p className="hint">Comments need the latest database update (update-4.sql in the supabase folder).</p>
-  }
+  const count = items === null ? '' : items.length === 0 ? 'empty so far' : `${items.length} ${items.length === 1 ? 'note' : 'notes'}`
+  const panelId = `margins-${copy.id}`
 
   return (
-    <section className="comments" aria-label="Comments">
-      {items === null ? (
-        <p className="hint">Loading comments…</p>
-      ) : items.length === 0 ? (
-        <p className="hint">No comments yet.</p>
-      ) : (
-        <ul className="comment-list">
-          {items.map((c) => {
-            const mine = c.user_id === me
-            return (
-              <li className="reader-comment" key={c.id}>
-                <div className="comment-meta">
-                  <strong>{mine ? myName : nameOf(c.user_id)}</strong>
-                  <time dateTime={c.created_at}>{fmtDate(c.created_at)} · {new Date(c.created_at).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}</time>
-                  {(mine || isOwner) && (
-                    confirmId === c.id ? (
-                      <span className="comment-confirm">
-                        <button type="button" className="linkish small danger-text" onClick={() => remove(c.id)}>Delete</button>
-                        <button type="button" className="linkish small muted" onClick={() => setConfirmId(null)}>Keep</button>
-                      </span>
-                    ) : (
-                      <button type="button" className="linkish small muted" onClick={() => setConfirmId(c.id)}
-                        aria-label={`Delete comment from ${mine ? 'you' : nameOf(c.user_id)}`}>Delete</button>
-                    )
-                  )}
-                </div>
-                <p>{c.body}</p>
-              </li>
-            )
-          })}
-        </ul>
-      )}
-      <form className="comment-form" onSubmit={post}>
-        <label htmlFor={`comment-${copy.id}`}>Comment on this book</label>
-        <div>
-          <input id={`comment-${copy.id}`} value={body} maxLength={2000} onChange={(e) => setBody(e.target.value)} placeholder="Share a thought…" />
-          <button type="submit" disabled={busy || !body.trim()}>Post</button>
+    <section className="margins" aria-label="The margins: notes from readers">
+      <button type="button" className="margins-toggle" aria-expanded={open} aria-controls={panelId} onClick={() => toggle(!open)}>
+        <span className="margins-label">{open ? 'Close the margins' : 'See the margins'}</span>
+        <span className="margins-count">{count}</span>
+      </button>
+      {open && (
+        <div className="margin-notes" id={panelId}>
+          {missing ? (
+            <p className="hint">The margins need the latest database update (update-4.sql in the supabase folder).</p>
+          ) : items === null ? (
+            <p className="hint">Opening the margins…</p>
+          ) : items.length === 0 ? (
+            <p className="hint">Nobody has written in the margins yet. Be the first.</p>
+          ) : (
+            <ul className="note-list">
+              {items.map((c) => {
+                const mine = c.user_id === me
+                return (
+                  <li className="margin-note" key={c.id}>
+                    <p className="note-body">{c.body}</p>
+                    <div className="note-meta">
+                      <span>— {mine ? myName : nameOf(c.user_id)}</span>
+                      <time dateTime={c.created_at}>{fmtDate(c.created_at)}</time>
+                      {(mine || isOwner) && (
+                        confirmId === c.id ? (
+                          <span className="comment-confirm">
+                            <button type="button" className="linkish small danger-text" onClick={() => remove(c.id)}>Erase</button>
+                            <button type="button" className="linkish small muted" onClick={() => setConfirmId(null)}>Keep</button>
+                          </span>
+                        ) : (
+                          <button type="button" className="linkish small muted" onClick={() => setConfirmId(c.id)}
+                            aria-label={`Erase note from ${mine ? 'you' : nameOf(c.user_id)}`}>Erase</button>
+                        )
+                      )}
+                    </div>
+                  </li>
+                )
+              })}
+            </ul>
+          )}
+          {!missing && (
+            <form className="margin-form" onSubmit={post}>
+              <label htmlFor={`comment-${copy.id}`}>Write in the margin</label>
+              <textarea id={`comment-${copy.id}`} rows={2} value={body} maxLength={2000} onChange={(e) => setBody(e.target.value)}
+                placeholder="A thought, a favorite line, a warning…"
+                onKeyDown={(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) post(e) }} />
+              <button type="submit" className="btn small" disabled={busy || !body.trim()}>Add note</button>
+            </form>
+          )}
         </div>
-      </form>
+      )}
     </section>
   )
 }
