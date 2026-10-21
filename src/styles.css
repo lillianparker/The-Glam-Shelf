@@ -837,21 +837,79 @@ svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width:
 .give-form select { width: auto; max-width: 100%; }
 .give-note { margin: 0; color: var(--muted); }
 
-/* ---------- Play tab ---------- */
+/* ---------- Play tab: Stack the shelf ---------- */
 .play-view { width: 100%; }
 .play-head .eyebrow { margin-bottom: 4px; }
-.play-soon {
-  display: flex; flex-wrap: wrap; align-items: center; gap: 24px 32px;
-  background: var(--surface); border: 1px solid var(--line); border-radius: 22px; padding: 28px 32px;
+.play-sub { margin: 10px 0 0; color: var(--muted); max-width: 60ch; }
+.stack-empty {
+  background: var(--surface); border: 1px dashed var(--line); border-radius: 18px; padding: 40px 20px;
+  text-align: center; color: var(--muted);
 }
-.play-soon h2 { font: 600 26px/1.1 var(--f-display); margin: 0 0 6px; }
-.play-soon p { margin: 0; color: var(--muted); max-width: 52ch; line-height: 1.6; }
-.play-stack { display: flex; flex-direction: column-reverse; align-items: center; width: 150px; flex-shrink: 0; }
-.play-stack i { display: block; height: 20px; border: 1.5px solid var(--outline); border-radius: 2px; margin-top: -1.5px; }
-.play-stack i:nth-child(1) { width: 140px; }
-.play-stack i:nth-child(2) { width: 124px; transform: translateX(-5px); }
-.play-stack i:nth-child(3) { width: 112px; transform: translateX(4px); }
-.play-stack i:nth-child(4) { width: 96px; transform: translateX(-2px); }
+.stack-wrap { display: flex; flex-direction: column; gap: 10px; max-width: 720px; width: 100%; margin-inline: auto; }
+.stack-hud { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; color: var(--muted); font-size: 13px; }
+.stack-score b { font: 600 26px/1 var(--f-display); color: var(--ink); font-variant-numeric: tabular-nums; margin-right: 2px; }
+.stack-area {
+  position: relative; height: min(70vh, 560px); min-height: 360px; overflow: hidden; cursor: pointer;
+  border-radius: 22px; border: 1px solid var(--line);
+  background:
+    radial-gradient(ellipse 80% 60% at 50% 0%, color-mix(in srgb, var(--page-glow) 80%, transparent), transparent 70%),
+    var(--surface);
+  user-select: none; -webkit-user-select: none; touch-action: manipulation; -webkit-tap-highlight-color: transparent;
+}
+.stack-area:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+.stack-world { position: absolute; inset: 0 6%; transition: transform 0.35s ease; }
+.stack-base {
+  position: absolute; left: -4%; right: -4%; bottom: 0;
+  background: var(--board); border-top: 1.5px solid var(--outline); box-shadow: 0 -10px 18px -10px var(--soft-shadow);
+}
+.stack-book {
+  position: absolute; display: flex; align-items: center; justify-content: center; overflow: hidden;
+  border: 1.5px solid var(--outline); border-radius: 3px; padding: 0 8px;
+  box-shadow: 0 4px 8px -4px var(--soft-shadow);
+}
+.stack-book::before { /* page edge on the open side */
+  content: ""; position: absolute; top: 4px; bottom: 4px; right: 4px; width: 5px;
+  background: repeating-linear-gradient(0deg, color-mix(in srgb, var(--sp-paper) 85%, transparent) 0 1px, transparent 1px 3px);
+  border-radius: 1px; opacity: 0.55;
+}
+.stack-book span { font: 500 14px/1 var(--f-display); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; position: relative; }
+.stack-book.moving { box-shadow: 0 10px 16px -8px var(--soft-shadow); }
+.stack-book.falling { animation: stack-fall-right 0.9s ease-in forwards; }
+.stack-book.falling.left { animation-name: stack-fall-left; }
+@keyframes stack-fall-right { to { transform: translate(40px, 260px) rotate(28deg); opacity: 0; } }
+@keyframes stack-fall-left { to { transform: translate(-40px, 260px) rotate(-28deg); opacity: 0; } }
+.stack-flash {
+  position: absolute; top: 18%; left: 50%; transform: translateX(-50%); pointer-events: none;
+  font: 600 italic 28px var(--f-display); color: var(--accent); text-shadow: 0 2px 10px var(--soft-shadow);
+  animation: stack-flash 0.9s ease-out forwards;
+}
+@keyframes stack-flash { from { opacity: 0; transform: translate(-50%, 8px); } 20% { opacity: 1; transform: translate(-50%, 0); } to { opacity: 0; transform: translate(-50%, -14px); } }
+.stack-overlay {
+  position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
+  text-align: center; padding: 20px; pointer-events: none;
+  background: color-mix(in srgb, var(--bg) 35%, transparent);
+}
+.stack-overlay p { margin: 0; color: var(--ink); }
+.stack-card {
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+  background: var(--surface); border: 1px solid var(--line); border-radius: 18px; padding: 20px 28px;
+  box-shadow: 0 18px 40px -10px var(--soft-shadow);
+}
+.stack-overlay-title { font: 600 34px/1.1 var(--f-display); }
+kbd {
+  font: 600 12px var(--f-mono); padding: 2px 7px; border-radius: 6px;
+  border: 1px solid var(--line); background: var(--surface); color: var(--ink);
+}
+@media (max-width: 620px) {
+  .stack-hint { display: none; }
+  .stack-book span { font-size: 12.5px; }
+  .stack-area { height: min(64vh, 520px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .stack-world { transition: none; }
+  .stack-book.falling { animation: none; opacity: 0; }
+  .stack-flash { animation: none; }
+}
 
 /* ---------- checkboxes (all my libraries) ---------- */
 .check { display: inline-flex; align-items: center; gap: 7px; cursor: pointer; }

@@ -414,7 +414,7 @@ export default function Library({ group, groups, profile, notice, clearNotice, o
           </div>
         </main>
       ) : view === 'play' ? (
-        <Play libraryName={group.name} />
+        <Play libraryName={group.name} books={books} />
       ) : (
         <main className="list-view stack-lg">
           <h1 className="view-title">All books</h1>
