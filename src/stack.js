@@ -11,7 +11,7 @@
 export const TUNING = {
   FIELD: 1000,          // width of the play area, in units
   START_WIDTH: 560,     // width of the first books
-  START_SPEED: 170,     // how fast the book slides at first (units per second); 170 is slow and relaxing
+  START_SPEED: 185,     // how fast the book slides at first (units per second); 170 is slow and relaxing
   SPEED_UP: 1.015,      // each book is this much faster than the last (1.015 = 1.5% faster)
   MAX_SPEED: 420,       // it never gets faster than this
   PERFECT_WITHIN: 10,   // a drop this close (in units) to the book below counts as perfect
