@@ -1,7 +1,8 @@
 // The Play tab: "Stack the shelf".
-// Stage 3: the game, with pause and your personal best (kept on this device for now). Rules live in stack.js.
+// Stage 4: the game, plus this library's leaderboard (each person's best). Rules live in stack.js.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { SPINE_TONES } from './shelf.js'
+import { AvatarBadge } from './AvatarPicker.jsx'
 import { TUNING, drop, newGame, pause, resume, shuffleTitles, step } from './stack.js'
 
 const BOOK_H = 34      // height of each book in the tower, in pixels
@@ -10,8 +11,8 @@ const BASE_H = 18      // the shelf the tower stands on
 
 const pct = (units) => `${(units / TUNING.FIELD) * 100}%`
 
-// Your best score in this library, remembered in this browser.
-// (Stage 4 moves this to the library's leaderboard so it follows you everywhere.)
+// Your best score in this library, also remembered in this browser
+// (so it still shows before the leaderboard is set up, or if you're offline).
 const bestKey = (groupId, userId) => `glam.stack.best.${groupId || 'here'}.${userId || 'me'}`
 function readBest(key) {
   try { return Math.max(0, parseInt(localStorage.getItem(key), 10) || 0) } catch { return 0 }
@@ -24,7 +25,8 @@ function reducedMotion() {
   try { return window.matchMedia('(prefers-reduced-motion: reduce)').matches } catch { return false }
 }
 
-export default function Play({ libraryName, groupId, me, books }) {
+export default function Play({ libraryName, groupId, me, books, board = null, onScore }) {
+  const myBest = board?.played.find((p) => p.id === me)?.best ?? 0
   const titles = useMemo(() => [...new Set((books || []).map((b) => b.title))], [books])
   return (
     <main className="play-view stack-lg">
@@ -38,16 +40,21 @@ export default function Play({ libraryName, groupId, me, books }) {
       ) : titles.length === 0 ? (
         <div className="stack-empty">Add a few books to this library and they’ll become the tower.</div>
       ) : (
-        <StackGame books={books} bestKey={bestKey(groupId, me)} />
+        <div className="play-layout">
+          <StackGame books={books} bestKey={bestKey(groupId, me)} savedBest={myBest} onScore={onScore} />
+          <Leaderboard board={board} me={me} />
+        </div>
       )}
     </main>
   )
 }
 
-export function StackGame({ books, bestKey: key = bestKey() }) {
+export function StackGame({ books, bestKey: key = bestKey(), savedBest = 0, onScore }) {
   const [game, setGame] = useState(() => newGame(shuffleTitles(books)))
   const [best, setBest] = useState(() => readBest(key))
   const [newBest, setNewBest] = useState(false)   // did the round that just ended beat it?
+  // your best on the leaderboard (from any device) counts too
+  useEffect(() => { if (savedBest > best) setBest(savedBest) }, [savedBest])   // eslint-disable-line react-hooks/exhaustive-deps
   const [falling, setFalling] = useState([])   // overhang pieces tumbling away
   const [flash, setFlash] = useState(null)     // "Perfect!" moments
   const areaRef = useRef(null)
@@ -70,10 +77,13 @@ export function StackGame({ books, bestKey: key = bestKey() }) {
     if (g.status === 'paused') { setGame(resume(g)); return }
     const next = drop(g)
     setGame(next)
-    if (next.status === 'over' && next.score > best) {
-      setBest(next.score)
-      setNewBest(true)
-      saveBest(key, next.score)
+    if (next.status === 'over') {
+      if (next.score > best) {
+        setBest(next.score)
+        setNewBest(true)
+        saveBest(key, next.score)
+      }
+      onScore?.(next.score)
     }
     if (next.lastDrop && next.lastDrop !== g.lastDrop) {
       const { kind, piece } = next.lastDrop
@@ -89,7 +99,7 @@ export function StackGame({ books, bestKey: key = bestKey() }) {
         setTimeout(() => setFlash((f) => (f && f.id === id ? null : f)), 900)
       }
     }
-  }, [books, best, key])
+  }, [books, best, key, onScore])
 
   const togglePause = useCallback(() => {
     const g = gameRef.current
@@ -246,5 +256,35 @@ function Block({ b, tone, bottom, moving = false, falling = 0 }) {
     >
       {!narrow && <span>{b.title}</span>}
     </div>
+  )
+}
+
+// This library's leaderboard: everyone's best, highest first.
+export function Leaderboard({ board, me }) {
+  return (
+    <section className="board" aria-labelledby="board-title">
+      <h2 id="board-title" className="board-title">Leaderboard</h2>
+      {board === null ? (
+        <p className="board-note">The leaderboard isn’t switched on yet (update-8.sql).</p>
+      ) : board.played.length === 0 ? (
+        <p className="board-note">No one’s on the board yet. Stack a few books to be first!</p>
+      ) : (
+        <ol className="board-list">
+          {board.played.map((p) => (
+            <li key={p.id} className={p.id === me ? 'is-me' : undefined}>
+              <span className="board-place" aria-label={`Number ${p.place}`}>{p.place}</span>
+              <AvatarBadge id={p.avatar} name={p.name} />
+              <span className="board-name">{p.id === me ? 'You' : p.name}</span>
+              <span className="board-best"><b>{p.best}</b> {p.best === 1 ? 'book' : 'books'}</span>
+            </li>
+          ))}
+        </ol>
+      )}
+      {board && board.notYet.length > 0 && (
+        <p className="board-waiting">
+          <span>Hasn’t played yet:</span> {board.notYet.map((m) => (m.id === me ? 'You' : m.name)).join(', ')}
+        </p>
+      )}
+    </section>
   )
 }

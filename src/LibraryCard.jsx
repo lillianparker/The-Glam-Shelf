@@ -1,14 +1,15 @@
-// The signed-in member's library card: real name, library, join date and points.
+// The signed-in member's library card: real name, library, card number, join date and points.
+// The card number is your place on the Stack the shelf leaderboard (0 until you've played).
 import { fmtDate } from './parts.jsx'
 import { AvatarBadge } from './AvatarPicker.jsx'
 
-export default function LibraryCard({ name, avatar, libraryName, joinedAt, score }) {
+export default function LibraryCard({ name, avatar, libraryName, joinedAt, score, cardNo = 0 }) {
   const s = score || { owned: 0, lent: 0, read: 0, total: 0 }
   return (
     <aside className="library-card" aria-label="Your library card">
       <div className="card-top">
         <span className="card-mark" aria-hidden="true">Glam</span>
-        <p>Library card<br /><strong>{libraryName}</strong></p>
+        <p>Library card <span className="card-no">Nº {cardNo}</span><br /><strong>{libraryName}</strong></p>
       </div>
       <div className="card-body">
         <div className="card-member">

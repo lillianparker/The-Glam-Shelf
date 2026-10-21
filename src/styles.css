@@ -658,6 +658,7 @@ svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width:
 }
 .card-top p { margin: 0; text-align: right; font-size: 9px; line-height: 1.5; letter-spacing: 0.08em; text-transform: uppercase; min-width: 0; overflow-wrap: anywhere; }
 .card-top p strong { font-size: 11px; }
+.card-no { font-family: var(--f-mono); letter-spacing: 0.04em; white-space: nowrap; }
 .card-body {
   padding: 24px 24px 18px;
   background-image: repeating-linear-gradient(0deg, transparent, transparent 27px, color-mix(in srgb, var(--ink) 9%, transparent) 28px);
@@ -846,6 +847,30 @@ svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width:
   text-align: center; color: var(--muted);
 }
 .stack-wrap { display: flex; flex-direction: column; gap: 10px; max-width: 720px; width: 100%; margin-inline: auto; }
+.play-layout { display: grid; gap: 28px; align-items: start; }
+@media (min-width: 1000px) {
+  .play-layout { grid-template-columns: minmax(0, 1fr) 290px; }
+  .play-layout .board { margin-top: 42px; }   /* lines up with the game box, under the score row */
+}
+.board {
+  background: var(--surface); border: 1px solid var(--line); border-radius: 18px; padding: 18px 18px 16px;
+  box-shadow: 0 10px 24px -14px var(--soft-shadow);
+}
+.board-title { margin: 0 0 12px; font: 600 22px/1.1 var(--f-display); }
+.board-note { margin: 0; color: var(--muted); font-size: 14px; }
+.board-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.board-list li {
+  display: grid; grid-template-columns: 22px auto minmax(0, 1fr) auto; align-items: center; gap: 10px;
+  padding: 7px 8px; border-radius: 12px;
+}
+.board-list li.is-me { background: var(--accent-soft); }
+.board-place { font: 600 16px/1 var(--f-display); color: var(--muted); text-align: center; font-variant-numeric: tabular-nums; }
+.board-list li:first-child .board-place { color: var(--accent); }
+.board-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.board-best { color: var(--muted); font-size: 13px; white-space: nowrap; }
+.board-best b { color: var(--ink); font: 600 17px/1 var(--f-display); font-variant-numeric: tabular-nums; margin-right: 1px; }
+.board-waiting { margin: 12px 0 0; padding-top: 12px; border-top: 1px dashed var(--line); color: var(--muted); font-size: 13px; }
+.board-waiting span { color: var(--ink); }
 .stack-hud { display: flex; justify-content: space-between; align-items: center; gap: 12px; min-height: 32px; color: var(--muted); font-size: 13px; }
 .stack-score b { font: 600 26px/1 var(--f-display); color: var(--ink); font-variant-numeric: tabular-nums; margin-right: 2px; }
 .stack-hud-right { display: inline-flex; align-items: center; gap: 12px; }

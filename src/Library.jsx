@@ -8,6 +8,7 @@ import Play from './Play.jsx'
 import LibraryCard from './LibraryCard.jsx'
 import AvatarPicker, { AvatarBadge } from './AvatarPicker.jsx'
 import { bookcaseTones, compareTitles, scoreMembers, shelfCopies } from './shelf.js'
+import { cardNumber, rankBoard, withRound } from './leaderboard.js'
 import { AddBook, Empty, ScoreLine, joinNames } from './parts.jsx'
 
 export { POINTS } from './shelf.js'
@@ -44,6 +45,7 @@ export default function Library({ group, groups, profile, notice, clearNotice, o
   const me = profile.id
   const [books, setBooks] = useState(null)
   const [members, setMembers] = useState([])
+  const [gameScores, setGameScores] = useState(null)   // "Stack the shelf" bests; null = leaderboard not set up (update-8.sql)
   const [loadError, setLoadError] = useState('')
   const [view, setView] = useState('home')          // 'home' (bookcase) | 'all' (list)
   const [expandedOwner, setExpandedOwner] = useState(null) // whose complete shelf is open on the bookcase
@@ -85,6 +87,9 @@ export default function Library({ group, groups, profile, notice, clearNotice, o
         .eq('group_id', group.id),
       loadMembers(group.id),
     ])
+    // The leaderboard loads on its own, so the library still works before update-8.sql is run.
+    supabase.from('game_scores').select('user_id, best, best_at, games').eq('group_id', group.id)
+      .then(({ data, error }) => setGameScores(error ? null : data || []))
     if (b.error || m.error) {
       const msg = friendlyError(b.error || m.error)
       setLoadError(msg)
@@ -118,6 +123,7 @@ export default function Library({ group, groups, profile, notice, clearNotice, o
       .on('postgres_changes', { event: '*', schema: 'public', table: 'loans' }, refresh)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'group_members', filter: `group_id=eq.${group.id}` }, refresh)
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'profiles' }, refresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'game_scores', filter: `group_id=eq.${group.id}` }, refresh)
       .subscribe()
     return () => { clearTimeout(timer); supabase.removeChannel(channel) }
   }, [group.id, load])
@@ -245,6 +251,15 @@ export default function Library({ group, groups, profile, notice, clearNotice, o
     .filter(person ? personTests[personTab] : tests[filter])
     .filter((b) => !q || `${b.title} ${b.author}`.toLowerCase().includes(q))
   const scores = useMemo(() => scoreMembers(books || [], members), [books, members])
+  const board = useMemo(() => rankBoard(gameScores || [], members), [gameScores, members])
+
+  // A round of Stack the shelf just ended: save it (the database keeps only your best).
+  const recordScore = useCallback(async (score) => {
+    if (gameScores === null) return   // leaderboard not set up yet
+    setGameScores((s) => withRound(s, me, score))
+    const { error } = await supabase.rpc('record_score', { gid: group.id, score })
+    if (error) showToast('Couldn’t save that score. Try another round in a moment.')
+  }, [gameScores, me, group.id, showToast])
   const tones = useMemo(() => bookcaseTones(books || []), [books])
 
   // ----- bookcase selection -----
@@ -410,11 +425,11 @@ export default function Library({ group, groups, profile, notice, clearNotice, o
                 showToast={showToast}
               />
             )}
-            <LibraryCard name={profile.display_name} avatar={profile.avatar} libraryName={group.name} joinedAt={myMember?.joinedAt} score={scores[me]} />
+            <LibraryCard name={profile.display_name} avatar={profile.avatar} libraryName={group.name} joinedAt={myMember?.joinedAt} score={scores[me]} cardNo={cardNumber(board, me)} />
           </div>
         </main>
       ) : view === 'play' ? (
-        <Play libraryName={group.name} groupId={group.id} me={me} books={books} />
+        <Play libraryName={group.name} groupId={group.id} me={me} books={books} board={gameScores === null ? null : board} onScore={recordScore} />
       ) : (
         <main className="list-view stack-lg">
           <h1 className="view-title">All books</h1>
