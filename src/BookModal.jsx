@@ -4,7 +4,7 @@ import { useEffect, useRef } from 'react'
 import BookListing from './BookListing.jsx'
 import { possessive } from './shelf.js'
 
-export default function BookModal({ entry, copies, onPickCopy, onClose, me, myName, nameOf, tones, listingProps }) {
+export default function BookModal({ entry, intro = null, copies, onPickCopy, onClose, me, myName, nameOf, tones, listingProps }) {
   const headingRef = useRef(null)
   const panelRef = useRef(null)
 
@@ -33,9 +33,11 @@ export default function BookModal({ entry, copies, onPickCopy, onClose, me, myNa
 
   return (
     <div className="modal-backdrop" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose() }}>
-      <div className="modal-panel" role="dialog" aria-modal="true" aria-labelledby="listing-title" ref={panelRef}>
+      <div className="modal-panel" role="dialog" aria-modal="true" aria-labelledby="modal-listing-title" ref={panelRef}>
         <div className="modal-bar">
-          {copies.length > 1 ? (
+          {intro ? (
+            <p className="modal-intro" role="status"><span aria-hidden="true">✓</span> {intro}</p>
+          ) : copies.length > 1 ? (
             <div className="copy-switch" role="group" aria-label="Copies of this book">
               {copies.map((c) => (
                 <button key={c.id} type="button" aria-pressed={c.id === entry.copy.id} onClick={() => onPickCopy(c.id)}>
@@ -48,7 +50,7 @@ export default function BookModal({ entry, copies, onPickCopy, onClose, me, myNa
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18" /></svg>
           </button>
         </div>
-        <BookListing key={entry.copy.id} ref={headingRef} entry={entry} tone={tones[entry.copy.id]} me={me} myName={myName} nameOf={nameOf} {...listingProps} />
+        <BookListing key={entry.copy.id} ref={headingRef} idBase="modal-listing" entry={entry} tone={tones[entry.copy.id]} me={me} myName={myName} nameOf={nameOf} {...listingProps} />
       </div>
     </div>
   )

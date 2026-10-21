@@ -58,8 +58,9 @@ export default function Library({ group, groups, profile, notice, clearNotice, o
   const toastTimer = useRef()
   const listingHeadingRef = useRef(null)
   const [modalCopyId, setModalCopyId] = useState(null)   // book open from the All books list
+  const [modalWhy, setModalWhy] = useState(null)        // 'added' when it popped up after adding a book
   const tileRefs = useRef({})
-  const lastTile = useRef(null)
+  const returnFocus = useRef(null)
   const searchRef = useRef(null)
   const focusSearch = useRef(false)
 
@@ -140,9 +141,13 @@ export default function Library({ group, groups, profile, notice, clearNotice, o
       if (res.error && /add_copy|function/i.test(res.error.message || '')) {
         // database not updated yet (update-6.sql): add it to this library only
         res = await supabase.rpc('add_copy', { gid: group.id, book_title: title, book_author: author })
-        if (!res.error && everywhere) { showToast(`Added “${title}” here. Showing books in all libraries needs update-6.sql.`); load(); return true }
+        if (!res.error && everywhere) showToast(`Added “${title}” here. Showing books in all libraries needs update-6.sql.`)
       }
-      return run(Promise.resolve(res), everywhere && groups.length > 1 ? `Added “${title}” to all your libraries` : `Added “${title}”`)
+      if (res.error) { showToast(friendlyError(res.error)); return false }
+      await load()
+      // pop the new book up so you can mark it read / reading / want to read straight away
+      if (res.data) openModal(res.data, 'added', document.getElementById('add-title'))
+      return true
     },
     setEverywhere: (copy, on) =>
       run(supabase.rpc('set_everywhere', { cid: copy.id, on_: on }), on ? 'Now in all your libraries' : 'Now only in this library'),
@@ -252,14 +257,20 @@ export default function Library({ group, groups, profile, notice, clearNotice, o
       || cs.find((c) => c.status === 'home' && c.lendable)
       || cs[0]
   }
+  // focusAfter: where to put the keyboard focus when it closes (the title tile, or the add form)
+  function openModal(copyId, why = null, focusAfter = null) {
+    returnFocus.current = focusAfter || document.activeElement
+    setModalWhy(why)
+    setModalCopyId(copyId)
+  }
   function openFromList(book) {
-    lastTile.current = book.id
-    setModalCopyId(pickCopy(book).id)
+    openModal(pickCopy(book).id, null, tileRefs.current[book.id])
   }
   const closeModal = useCallback(() => {
     setModalCopyId(null)
-    const t = tileRefs.current[lastTile.current]
-    if (t) requestAnimationFrame(() => t.focus())
+    setModalWhy(null)
+    const el = returnFocus.current
+    if (el && el.isConnected) requestAnimationFrame(() => el.focus())
   }, [])
   const modalEntry = findEntry(modalCopyId)
 
@@ -460,20 +471,22 @@ export default function Library({ group, groups, profile, notice, clearNotice, o
               </ul>
             )}
           </section>
-          {modalEntry && (
-            <BookModal
-              entry={modalEntry}
-              copies={[...modalEntry.book.copies].sort((a, b) => (b.owner_id === me) - (a.owner_id === me) || a.created_at.localeCompare(b.created_at))}
-              onPickCopy={setModalCopyId}
-              onClose={closeModal}
-              me={me}
-              myName={profile.display_name}
-              nameOf={nameOf}
-              tones={tones}
-              listingProps={{ members, actions, showToast }}
-            />
-          )}
         </main>
+      )}
+
+      {modalEntry && (
+        <BookModal
+          entry={modalEntry}
+          intro={modalWhy === 'added' ? 'Added to your shelf. Have you read it?' : null}
+          copies={[...modalEntry.book.copies].sort((a, b) => (b.owner_id === me) - (a.owner_id === me) || a.created_at.localeCompare(b.created_at))}
+          onPickCopy={setModalCopyId}
+          onClose={closeModal}
+          me={me}
+          myName={profile.display_name}
+          nameOf={nameOf}
+          tones={tones}
+          listingProps={{ members, actions, showToast }}
+        />
       )}
 
       {toast && <div className="toast" role="status">{toast}</div>}

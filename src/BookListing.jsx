@@ -4,7 +4,7 @@ import { supabase, friendlyError } from './supabase.js'
 import { CopyRow, ReadingControls, Verdicts, fmtDate, isStarred } from './parts.jsx'
 import { availabilityText, libraryLog, possessive, spineTone } from './shelf.js'
 
-const BookListing = forwardRef(function BookListing({ entry, tone, me, myName, members, nameOf, actions, showToast, onAddBook }, headingRef) {
+const BookListing = forwardRef(function BookListing({ entry, tone, idBase = 'listing', me, myName, members, nameOf, actions, showToast, onAddBook }, headingRef) {
   const [tab, setTab] = useState('comments')
   const tabsRef = useRef([])
   const copyId = entry?.copy.id
@@ -12,10 +12,10 @@ const BookListing = forwardRef(function BookListing({ entry, tone, me, myName, m
 
   if (!entry) {
     return (
-      <article className="listing empty-listing" aria-labelledby="listing-title">
+      <article className="listing empty-listing" aria-labelledby={`${idBase}-title`}>
         <div>
           <span className="eyebrow">Book listing</span>
-          <h2 id="listing-title" ref={headingRef} tabIndex={-1}>Pick a spine</h2>
+          <h2 id={`${idBase}-title`} ref={headingRef} tabIndex={-1}>Pick a spine</h2>
           <p className="muted">Choose any book on the shelves above to see where it is, who's read it, and how to borrow it.</p>
           {onAddBook && <button type="button" className="btn" onClick={onAddBook}>Add a book you own</button>}
         </div>
@@ -42,14 +42,14 @@ const BookListing = forwardRef(function BookListing({ entry, tone, me, myName, m
   }
 
   return (
-    <article className="listing" aria-labelledby="listing-title">
+    <article className="listing" aria-labelledby={`${idBase}-title`}>
       <div className="cover-col">
         <BookCover title={book.title} author={book.author} tone={tone || spineTone(copy.id)} />
         <Comments copy={copy} me={me} isOwner={isOwner} nameOf={nameOf} myName={myName} showToast={showToast} />
       </div>
       <div className="book-copy">
         <span className="eyebrow">{isOwner ? 'From your shelf' : `From ${possessive(ownerName)} shelf`}</span>
-        <h2 id="listing-title" ref={headingRef} tabIndex={-1}>
+        <h2 id={`${idBase}-title`} ref={headingRef} tabIndex={-1}>
           {book.title}
           {isStarred(book, members) && <span className="star" title="Everyone in the library has read this">★ Read by everyone</span>}
         </h2>
@@ -62,9 +62,9 @@ const BookListing = forwardRef(function BookListing({ entry, tone, me, myName, m
               ref={(el) => (tabsRef.current[i] = el)}
               type="button"
               role="tab"
-              id={`tab-${key}`}
+              id={`${idBase}-tab-${key}`}
               aria-selected={tab === key}
-              aria-controls={`panel-${key}`}
+              aria-controls={`${idBase}-panel-${key}`}
               tabIndex={tab === key ? 0 : -1}
               className={tab === key ? 'active' : ''}
               onClick={() => setTab(key)}
@@ -74,7 +74,7 @@ const BookListing = forwardRef(function BookListing({ entry, tone, me, myName, m
         </div>
 
         {tab === 'comments' ? (
-          <div className="details-panel" role="tabpanel" id="panel-comments" aria-labelledby="tab-comments">
+          <div className="details-panel" role="tabpanel" id={`${idBase}-panel-comments`} aria-labelledby={`${idBase}-tab-comments`}>
             <dl className="facts">
               <div><dt>Owner</dt><dd>{isOwner ? `${myName} (you)` : ownerName}</dd></div>
               <div>
@@ -96,7 +96,7 @@ const BookListing = forwardRef(function BookListing({ entry, tone, me, myName, m
 
           </div>
         ) : (
-          <div className="log-panel" role="tabpanel" id="panel-log" aria-labelledby="tab-log">
+          <div className="log-panel" role="tabpanel" id={`${idBase}-panel-log`} aria-labelledby={`${idBase}-tab-log`}>
             <LibraryLog copy={copy} nameOf={nameOf} />
           </div>
         )}
