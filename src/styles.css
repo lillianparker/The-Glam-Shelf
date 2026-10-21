@@ -17,6 +17,8 @@
   --sage-soft: #33402d;
   --page-glow: #432c27;     /* the warm lamp light at the top of the page */
   --panel-shadow: rgba(10, 5, 5, 0.45);
+  --soft-shadow: rgba(8, 4, 4, 0.5);   /* lamp-light shadows under books, shelves, cover, card */
+  --ribbon: #8f1d3f;        /* burgundy bookmark ribbon: out on loan or being read */
   --danger: #ff9d8f;
   --wine: #5c1f34;
   --card-pink: #f6d9e3;
@@ -477,7 +479,7 @@ svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width:
 .shelf-board {
   position: absolute; left: 18px; right: 18px; bottom: 0; height: 17px; z-index: 3;
   background: var(--board); border: 1.5px solid var(--outline);
-  box-shadow: 0 7px 0 var(--board-edge);
+  box-shadow: 0 6px 0 var(--board-edge), 0 16px 18px -4px var(--soft-shadow);
 }
 
 .spine {
@@ -486,6 +488,7 @@ svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width:
   display: flex; flex-direction: column; align-items: center; justify-content: space-between; gap: 6px;
   cursor: pointer; text-align: center;
   transition: transform 0.18s ease, box-shadow 0.18s ease;
+  box-shadow: 3px 0 6px -2px var(--soft-shadow);
 }
 .spine::before { /* the little bands near the top and bottom of a real spine */
   content: ""; position: absolute; left: 0; right: 0; top: 7px; height: 3px;
@@ -504,14 +507,19 @@ svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width:
   max-height: 30%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; flex-shrink: 0;
 }
 .spine:hover, .spine.selected { transform: translateY(-9px); }
-.spine.selected { box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--accent); }
+.spine.selected { box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--accent), 0 10px 14px var(--soft-shadow); }
+.spine:hover { box-shadow: 3px 8px 12px -2px var(--soft-shadow); }
 .spine:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
-.spine-ribbon { /* out on loan */
-  position: absolute; top: -1.5px; right: 5px; width: 10px; height: 20px; background: var(--accent);
+.spine-ribbon { /* out on loan or being read: a burgundy ribbon with a thin cream edge so it shows on any spine colour */
+  position: absolute; top: -1.5px; right: 5px; width: 11px; height: 22px; background: var(--sp-paper);
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 72%, 0 100%);
+}
+.spine-ribbon::after {
+  content: ""; position: absolute; inset: 0 1px 2px; background: var(--ribbon);
   clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 72%, 0 100%);
 }
 .legend { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: 12px; }
-.legend-ribbon { width: 8px; height: 14px; background: var(--accent); clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 72%, 0 100%); }
+.legend-ribbon { width: 8px; height: 14px; background: var(--ribbon); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--sp-paper) 70%, transparent); clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 72%, 0 100%); }
 
 .more-books {
   flex: 0 0 var(--more-w); width: var(--more-w); height: 44px; align-self: center;
@@ -549,7 +557,7 @@ svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width:
 .cover {
   position: relative; aspect-ratio: 0.68; width: 100%; max-width: 210px; align-self: start;
   border: 1.5px solid var(--outline); border-radius: 2px 8px 8px 2px;
-  box-shadow: -8px 7px 0 var(--outline); padding: 22px 18px;
+  box-shadow: 0 18px 30px -6px var(--soft-shadow), 0 3px 6px rgba(8, 4, 4, 0.35); padding: 22px 18px;
   display: flex; flex-direction: column; justify-content: space-between; overflow: hidden;
 }
 .cover::after { content: ""; position: absolute; inset: 9px; border: 1px solid currentColor; opacity: 0.45; pointer-events: none; }
@@ -621,7 +629,7 @@ svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width:
   --ink: #2a1a20; --muted: #6a5059; --accent: #a3194f; --accent-soft: #f8dbe5; --surface: #fff7f9; --line: #e7c9d3; --sp-pink: #f6c1d4;
   color: var(--ink);
   background: var(--card-pink); border: 1.5px solid var(--outline); border-radius: 17px; overflow: hidden;
-  transform: rotate(1deg); box-shadow: 8px 9px 0 var(--outline);
+  transform: rotate(1deg); box-shadow: 0 20px 36px -8px var(--soft-shadow), 0 3px 8px rgba(8, 4, 4, 0.35);
 }
 .card-top { background: var(--wine); color: #fff; padding: 18px 22px; display: flex; justify-content: space-between; align-items: center; gap: 12px; }
 .card-mark {
@@ -713,7 +721,7 @@ svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width:
 }
 .shelf-object {
   display: block; max-width: 100%; max-height: calc(var(--spine-max) * 0.62); object-fit: contain;
-  filter: drop-shadow(0 2px 0 color-mix(in srgb, var(--outline) 18%, transparent));
+  filter: drop-shadow(2px 6px 5px var(--soft-shadow));
 }
 .deco-pick {
   width: 100%; min-height: 72px; margin-bottom: 4px; padding: 8px 6px; cursor: pointer;
