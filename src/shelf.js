@@ -105,11 +105,20 @@ export function chunkRows(items, width, { spine, gap }) {
   return rows
 }
 
+// How a title is filed: like a library, a leading "The", "A" or "An" is skipped,
+// so The Bell Jar files under B. (The title itself is still shown in full.)
+export function titleSortKey(title) {
+  return String(title || '').trim().replace(/^(the|a|an)\s+/i, '')
+}
+export function compareTitles(a, b) {
+  return titleSortKey(a).localeCompare(titleSortKey(b), undefined, { sensitivity: 'base', numeric: true }) || String(a).localeCompare(String(b))
+}
+
 // Spines on a shelf: alphabetical by title, like a tidy bookcase.
 export function shelfCopies(books, ownerId) {
   const out = []
   for (const b of books) for (const c of b.copies) if (c.owner_id === ownerId) out.push({ copy: c, book: b })
-  return out.sort((x, y) => x.book.title.localeCompare(y.book.title) || x.copy.created_at.localeCompare(y.copy.created_at))
+  return out.sort((x, y) => compareTitles(x.book.title, y.book.title) || x.copy.created_at.localeCompare(y.copy.created_at))
 }
 
 // ---------- library log ----------

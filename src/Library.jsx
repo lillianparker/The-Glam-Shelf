@@ -6,7 +6,7 @@ import BookListing from './BookListing.jsx'
 import BookModal from './BookModal.jsx'
 import LibraryCard from './LibraryCard.jsx'
 import AvatarPicker, { AvatarBadge } from './AvatarPicker.jsx'
-import { bookcaseTones, scoreMembers, shelfCopies } from './shelf.js'
+import { bookcaseTones, compareTitles, scoreMembers, shelfCopies } from './shelf.js'
 import { AddBook, Empty, ScoreLine, joinNames } from './parts.jsx'
 
 export { POINTS } from './shelf.js'
@@ -99,7 +99,7 @@ export default function Library({ group, groups, profile, notice, clearNotice, o
         c.book = { id: book.id, title: book.title, author: book.author }
       }
     }
-    setBooks(b.data.sort((x, y) => x.title.localeCompare(y.title)))
+    setBooks(b.data.sort((x, y) => compareTitles(x.title, y.title)))
     setMembers(m.data.map((r) => ({ id: r.user_id, name: r.profiles?.display_name || 'A friend', avatar: r.profiles?.avatar || null, joinedAt: r.joined_at })))
   }, [group.id, showToast])
 
@@ -147,6 +147,14 @@ export default function Library({ group, groups, profile, notice, clearNotice, o
       await load()
       // pop the new book up so you can mark it read / reading / want to read straight away
       if (res.data) openModal(res.data, 'added', document.getElementById('add-title'))
+      return true
+    },
+    giveCopy: async (copy, friendId) => {
+      const { error } = await supabase.rpc('give_copy', { cid: copy.id, new_owner: friendId })
+      if (error) { showToast(/give_copy|function/i.test(error.message || '') && !/owner|library/i.test(error.message || '') ? 'This needs the latest database update (update-7.sql).' : friendlyError(error)); return false }
+      setModalCopyId(null)
+      showToast(`Moved to ${nameOf(friendId)}’s shelf`)
+      load()
       return true
     },
     setEverywhere: (copy, on) =>

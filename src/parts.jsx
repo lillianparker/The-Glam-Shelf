@@ -169,7 +169,8 @@ export function AddBook({ onAdd, open: openProp, onOpenChange }) {
 export function CopyRow({ copy, me, members, nameOf, actions, compact = false, hideHistory = false }) {
   const isOwner = copy.owner_id === me
   const isHolder = copy.lent_to_user === me
-  const [confirming, setConfirming] = useState(null) // 'remove' | 'stop' | 'edit'
+  const [confirming, setConfirming] = useState(null) // 'remove' | 'stop' | 'edit' | 'give'
+  const [giveTo, setGiveTo] = useState('')
   const [editTitle, setEditTitle] = useState(copy.book.title)
   const [editAuthor, setEditAuthor] = useState(copy.book.author || '')
   const [otherOpen, setOtherOpen] = useState(false)
@@ -321,6 +322,29 @@ export function CopyRow({ copy, me, members, nameOf, actions, compact = false, h
                 <button type="button" className="btn small ghost" onClick={() => { setConfirming(null); setEditTitle(copy.book.title); setEditAuthor(copy.book.author || '') }}>Cancel</button>
               </div>
             </form>
+          ) : confirming === 'give' ? (
+            <div className="give-form">
+              <label className="field" htmlFor={`give-${copy.id}`}>
+                <span>Whose book is it?</span>
+                <select id={`give-${copy.id}`} value={giveTo} onChange={(e) => setGiveTo(e.target.value)}>
+                  <option value="">Choose a friend…</option>
+                  {others.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+                </select>
+              </label>
+              {giveTo && (
+                <p className="small give-note">
+                  It moves to {members.find((m) => m.id === giveTo)?.name}’s shelf, with its notes and history, and leaves your other libraries.
+                  After that, only {members.find((m) => m.id === giveTo)?.name} can change it.
+                </p>
+              )}
+              <div className="edit-actions">
+                <button type="button" className="btn small" disabled={!giveTo}
+                  onClick={async () => { if (await actions.giveCopy(copy, giveTo)) { setConfirming(null); setGiveTo('') } }}>
+                  {giveTo ? `Move to ${members.find((m) => m.id === giveTo)?.name}’s shelf` : 'Move'}
+                </button>
+                <button type="button" className="btn small ghost" onClick={() => { setConfirming(null); setGiveTo('') }}>Cancel</button>
+              </div>
+            </div>
           ) : confirming === 'remove' ? (
             <>
               <span className="small">{copy.everywhere ? 'Remove your copy from all your libraries?' : 'Remove your copy from the shelf?'}</span>
@@ -339,6 +363,9 @@ export function CopyRow({ copy, me, members, nameOf, actions, compact = false, h
                 <span>In all my libraries</span>
               </label>
               <button type="button" className="linkish small" onClick={() => { setEditTitle(copy.book.title); setEditAuthor(copy.book.author || ''); setConfirming('edit') }}>Edit title or author</button>
+              {others.length > 0 && (
+                <button type="button" className="linkish small" onClick={() => setConfirming('give')}>This is actually a friend’s</button>
+              )}
               <button type="button" className="linkish small muted" onClick={() => setConfirming('remove')}>Remove</button>
             </>
           )}

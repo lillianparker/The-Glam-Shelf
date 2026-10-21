@@ -816,6 +816,10 @@ svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width:
 .copy-switch button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
 .modal-panel .listing { box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5); }
 
+.give-form { flex-basis: 100%; display: flex; flex-direction: column; gap: 8px; max-width: 420px; }
+.give-form select { width: auto; max-width: 100%; }
+.give-note { margin: 0; color: var(--muted); }
+
 /* ---------- checkboxes (all my libraries) ---------- */
 .check { display: inline-flex; align-items: center; gap: 7px; cursor: pointer; }
 .check input { width: 16px; height: 16px; margin: 0; accent-color: var(--accent); cursor: pointer; flex-shrink: 0; }
