@@ -846,8 +846,16 @@ svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width:
   text-align: center; color: var(--muted);
 }
 .stack-wrap { display: flex; flex-direction: column; gap: 10px; max-width: 720px; width: 100%; margin-inline: auto; }
-.stack-hud { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; color: var(--muted); font-size: 13px; }
+.stack-hud { display: flex; justify-content: space-between; align-items: center; gap: 12px; min-height: 32px; color: var(--muted); font-size: 13px; }
 .stack-score b { font: 600 26px/1 var(--f-display); color: var(--ink); font-variant-numeric: tabular-nums; margin-right: 2px; }
+.stack-hud-right { display: inline-flex; align-items: center; gap: 12px; }
+.stack-best b { color: var(--ink); font-variant-numeric: tabular-nums; }
+.stack-pause {
+  font: inherit; font-size: 13px; color: var(--ink); background: var(--surface); cursor: pointer;
+  border: 1px solid var(--line); border-radius: 999px; padding: 4px 12px;
+}
+.stack-pause:hover { border-color: var(--accent); }
+.stack-pause:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .stack-area {
   position: relative; height: min(70vh, 560px); min-height: 360px; overflow: hidden; cursor: pointer;
   border-radius: 22px; border: 1px solid var(--line);
@@ -896,12 +904,17 @@ svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width:
   box-shadow: 0 18px 40px -10px var(--soft-shadow);
 }
 .stack-overlay-title { font: 600 34px/1.1 var(--f-display); }
+.stack-overlay p.stack-card-note { color: var(--muted); font-size: 14px; }
+.stack-overlay p.stack-new-best {
+  font: 600 italic 18px var(--f-display); color: var(--accent); letter-spacing: 0.02em;
+  animation: stack-flash-in 0.5s ease-out;
+}
+@keyframes stack-flash-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 kbd {
   font: 600 12px var(--f-mono); padding: 2px 7px; border-radius: 6px;
   border: 1px solid var(--line); background: var(--surface); color: var(--ink);
 }
 @media (max-width: 620px) {
-  .stack-hint { display: none; }
   .stack-book span { font-size: 12.5px; }
   .stack-area { height: min(64vh, 520px); }
 }
@@ -909,6 +922,7 @@ kbd {
   .stack-world { transition: none; }
   .stack-book.falling { animation: none; opacity: 0; }
   .stack-flash { animation: none; }
+  .stack-overlay p.stack-new-best { animation: none; }
 }
 
 /* ---------- checkboxes (all my libraries) ---------- */

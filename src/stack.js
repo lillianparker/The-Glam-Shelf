@@ -11,7 +11,7 @@
 export const TUNING = {
   FIELD: 1000,          // width of the play area, in units
   START_WIDTH: 560,     // width of the first books
-  START_SPEED: 185,     // how fast the book slides at first (units per second); 170 is slow and relaxing
+  START_SPEED: 185,     // how fast the book slides at first (units per second); lower is slower
   SPEED_UP: 1.015,      // each book is this much faster than the last (1.015 = 1.5% faster)
   MAX_SPEED: 420,       // it never gets faster than this
   PERFECT_WITHIN: 10,   // a drop this close (in units) to the book below counts as perfect
@@ -43,7 +43,7 @@ export function travelRange(width, top, t = TUNING) {
 export function newGame(titles, random = Math.random, t = TUNING) {
   const first = { x: (t.FIELD - t.START_WIDTH) / 2, w: t.START_WIDTH, title: titles[0] || 'The Glam Shelf', tone: 0 }
   return {
-    status: 'ready',      // 'ready' → 'playing' → 'over'
+    status: 'ready',      // 'ready' → 'playing' (⇄ 'paused') → 'over'
     titles,
     next: 1,              // index of the next title to use
     tower: [first],       // bottom to top
@@ -77,6 +77,14 @@ export function step(game, dt, t = TUNING) {
   if (x > range.max) { x = range.max - (x - range.max); dir = -1 }
   if (x < range.min) { x = range.min + (range.min - x); dir = 1 }
   return { ...game, current: { ...c, x, dir } }
+}
+
+// Pause and keep going. A paused book stays exactly where it was.
+export function pause(game) {
+  return game.status === 'playing' ? { ...game, status: 'paused' } : game
+}
+export function resume(game) {
+  return game.status === 'paused' ? { ...game, status: 'playing' } : game
 }
 
 // Drop the sliding book onto the stack.
