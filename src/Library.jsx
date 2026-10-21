@@ -4,6 +4,7 @@ import Wordmark from './Wordmark.jsx'
 import Bookcase from './Bookcase.jsx'
 import BookListing from './BookListing.jsx'
 import BookModal from './BookModal.jsx'
+import Play from './Play.jsx'
 import LibraryCard from './LibraryCard.jsx'
 import AvatarPicker, { AvatarBadge } from './AvatarPicker.jsx'
 import { bookcaseTones, compareTitles, scoreMembers, shelfCopies } from './shelf.js'
@@ -314,6 +315,7 @@ export default function Library({ group, groups, profile, notice, clearNotice, o
     ['bookcase', 'Bookcase', view === 'home' && !expandedOwner, () => go('home')],
     ['mine', 'My shelf', view === 'home' && expandedOwner === me, () => go('home', { expand: me })],
     ['all', 'All books', view === 'all', () => go('all')],
+    ['play', 'Play', view === 'play', () => go('play')],
   ]
 
   return (
@@ -411,6 +413,8 @@ export default function Library({ group, groups, profile, notice, clearNotice, o
             <LibraryCard name={profile.display_name} avatar={profile.avatar} libraryName={group.name} joinedAt={myMember?.joinedAt} score={scores[me]} />
           </div>
         </main>
+      ) : view === 'play' ? (
+        <Play libraryName={group.name} />
       ) : (
         <main className="list-view stack-lg">
           <h1 className="view-title">All books</h1>

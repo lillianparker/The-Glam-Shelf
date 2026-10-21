@@ -226,15 +226,15 @@ export function Spine({ copy, book, me, nameOf, ownerName, selected, onOpen, ton
   return (
     <button
       type="button"
-      className={`spine tone-${tone || spineTone(copy.id)}${selected ? ' selected' : ''}${ribbon ? ' out' : ''}`}
+      className={`spine tone-${tone || spineTone(copy.id)}${selected ? ' selected' : ''}${ribbon ? ' out' : ''}${book.author ? '' : ' no-author'}`}
       style={{ '--h': spineHeight(copy.id) }}
       aria-label={label}
       aria-pressed={selected}
       title={`${book.title}${book.author ? ` — ${book.author}` : ''}`}
       onClick={() => onOpen(copy.id)}
     >
-      <span className="spine-title">{book.title}</span>
-      {book.author && <small className="spine-author">{book.author.split(' ').slice(-1)[0]}</small>}
+      <span className="spine-title"><span>{book.title}</span></span>
+      {book.author && <small className="spine-author"><span>{book.author.split(' ').slice(-1)[0]}</span></small>}
       {ribbon && <i className="spine-ribbon" aria-hidden="true" />}
     </button>
   )

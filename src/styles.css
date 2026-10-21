@@ -497,18 +497,35 @@ svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width:
   content: ""; position: absolute; left: 0; right: 0; top: 7px; height: 3px;
   border-block: 1px solid color-mix(in srgb, currentColor 35%, transparent); pointer-events: none;
 }
-.spine-title { /* up to two columns of text, then "…" */
-  writing-mode: vertical-rl; transform: rotate(180deg);
-  font: 500 14px/1.08 var(--f-display);
-  flex: 1 1 auto; min-height: 0; overflow: hidden; overflow-wrap: anywhere;
-  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2;
-  padding-top: 4px;
+/* Spine text: ordinary text turned a quarter-turn to read bottom-to-top, like a real spine.
+   (Rotating normal text behaves the same in every browser, including iPhone Safari.) */
+.spine {
+  --inner-len: calc(var(--h, 0.9) * var(--spine-max) - 3px);  /* inside the border */
+  --inner-wid: calc(var(--spine-w) - 3px);
+  --title-len: calc(var(--inner-len) * 0.70 - 12px);
+  --author-len: calc(var(--inner-len) * 0.28 - 8px);
+}
+.spine.no-author { --title-len: calc(var(--inner-len) - 20px); }
+.spine-title, .spine-author {
+  position: absolute; left: 50%;
+  display: flex; align-items: center; justify-content: center; text-align: center;
+  transform: translate(-50%, -50%) rotate(-90deg);
+  pointer-events: none;
+}
+.spine-title {
+  top: calc(12px + var(--title-len) / 2);
+  width: var(--title-len); height: calc(var(--inner-wid) - 8px);
+}
+.spine-title > span { /* up to two lines, then "…" */
+  font: 500 14px/1.08 var(--f-display); overflow-wrap: anywhere;
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden;
 }
 .spine-author {
-  writing-mode: vertical-rl; transform: rotate(180deg);
+  top: calc(var(--inner-len) * 0.72 + var(--author-len) / 2);
+  width: var(--author-len); height: 12px;
   font: 600 8px var(--f-body); letter-spacing: 0.08em; text-transform: uppercase;
-  max-height: 30%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; flex-shrink: 0;
 }
+.spine-author > span { display: block; max-width: 100%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .spine:hover, .spine.selected { transform: translateY(-9px); }
 .spine.selected { box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--accent), 0 10px 14px var(--soft-shadow); }
 .spine:hover { box-shadow: 3px 8px 12px -2px var(--soft-shadow); }
@@ -658,7 +675,7 @@ svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width:
 /* ---------- responsive ---------- */
 @media (max-width: 900px) {
   .topbar { grid-template-columns: 1fr auto; }
-  .topbar nav { grid-column: 1 / -1; grid-row: 2; gap: 22px; overflow-x: auto; }
+  .topbar nav { grid-column: 1 / -1; grid-row: 2; gap: 22px; overflow-x: auto; padding-bottom: 4px; }
   .content-grid { grid-template-columns: 1fr; }
   .content-grid.card-only > .library-card { grid-column: auto; }
   .library-card { max-width: 440px; transform: none; }
@@ -674,7 +691,7 @@ svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width:
   .shelf-label { padding-inline: 18px; }
   .shelf-scene { padding: 14px 18px 0; }
   .shelf-board { left: 10px; right: 10px; }
-  .spine-title { font-size: 13px; }
+  .spine-title > span { font-size: 13px; }
   .listing { grid-template-columns: 1fr; padding: 22px 18px; gap: 26px; }
   .cover { width: 170px; }
   .cover-col { gap: 14px; }
@@ -819,6 +836,22 @@ svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width:
 .give-form { flex-basis: 100%; display: flex; flex-direction: column; gap: 8px; max-width: 420px; }
 .give-form select { width: auto; max-width: 100%; }
 .give-note { margin: 0; color: var(--muted); }
+
+/* ---------- Play tab ---------- */
+.play-view { width: 100%; }
+.play-head .eyebrow { margin-bottom: 4px; }
+.play-soon {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 24px 32px;
+  background: var(--surface); border: 1px solid var(--line); border-radius: 22px; padding: 28px 32px;
+}
+.play-soon h2 { font: 600 26px/1.1 var(--f-display); margin: 0 0 6px; }
+.play-soon p { margin: 0; color: var(--muted); max-width: 52ch; line-height: 1.6; }
+.play-stack { display: flex; flex-direction: column-reverse; align-items: center; width: 150px; flex-shrink: 0; }
+.play-stack i { display: block; height: 20px; border: 1.5px solid var(--outline); border-radius: 2px; margin-top: -1.5px; }
+.play-stack i:nth-child(1) { width: 140px; }
+.play-stack i:nth-child(2) { width: 124px; transform: translateX(-5px); }
+.play-stack i:nth-child(3) { width: 112px; transform: translateX(4px); }
+.play-stack i:nth-child(4) { width: 96px; transform: translateX(-2px); }
 
 /* ---------- checkboxes (all my libraries) ---------- */
 .check { display: inline-flex; align-items: center; gap: 7px; cursor: pointer; }
