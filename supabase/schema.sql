@@ -800,3 +800,39 @@ revoke execute on function public.set_all_everywhere(uuid, boolean) from public,
 grant execute on function public.add_copy(uuid, text, text, boolean) to authenticated;
 grant execute on function public.set_everywhere(uuid, boolean) to authenticated;
 grant execute on function public.set_all_everywhere(uuid, boolean) to authenticated;
+
+-------------------------------------------------------------------------------
+-- "This is actually a friend's" (update 7)
+-------------------------------------------------------------------------------
+
+create or replace function public.give_copy(cid uuid, new_owner uuid) returns void
+language plpgsql security definer set search_path = public as $$
+declare c copies; gid uuid;
+begin
+  select * into c from copies where id = cid;
+  if not found or c.owner_id is distinct from auth.uid() then
+    raise exception 'Only the owner can move this book';
+  end if;
+  if new_owner is null or new_owner = c.owner_id then return; end if;
+  gid := book_group(c.book_id);
+  if not exists (select 1 from group_members where group_id = gid and user_id = new_owner) then
+    raise exception 'They need to be in this library first';
+  end if;
+
+  perform set_config('glam.syncing', 'on', true);
+  -- it leaves your other libraries
+  delete from copies where item_id = c.item_id and id <> c.id;
+  -- and becomes theirs, here
+  update copies set
+    owner_id = new_owner,
+    everywhere = false,
+    status = case when lent_to_user = new_owner then 'home' else status end,
+    lent_at = case when lent_to_user = new_owner then null else lent_at end,
+    lent_to_user = case when lent_to_user = new_owner then null else lent_to_user end
+  where id = cid;
+  delete from queue where copy_id = cid and user_id = new_owner;
+  perform set_config('glam.syncing', 'off', true);
+end $$;
+
+revoke execute on function public.give_copy(uuid, uuid) from public, anon;
+grant execute on function public.give_copy(uuid, uuid) to authenticated;
