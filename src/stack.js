@@ -16,7 +16,9 @@ export const TUNING = {
   MAX_SPEED: 420,       // it never gets faster than this
   PERFECT_WITHIN: 10,   // a drop this close (in units) to the book below counts as perfect
   PERFECT_GROW: 40,     // a perfect drop grows the book back by this much
-  CLEAR: 12,            // how far the sliding book goes past the stack on each side, so a total miss is possible
+  SWING: 260,           // how far past the stack the sliding book travels on each side; bigger = wider swing, harder to just tap Space
+  CLEAR: 12,            // it always goes at least this far past the stack, so a total miss is always possible
+  EDGE_SHOW: 20,        // ...but never so far that it disappears off the edge of the screen
 }
 
 // Shuffle the library's titles into a random order to stack (each title once per round).
@@ -33,10 +35,13 @@ export function speedFor(score, t = TUNING) {
   return Math.min(t.MAX_SPEED, t.START_SPEED * Math.pow(t.SPEED_UP, score))
 }
 
-// Where the sliding book can go: from completely off the left of the book below
-// to completely off its right, so every drop is a real decision.
+// Where the sliding book can go: SWING past the book below on each side, so a lot of the
+// time it isn't over the stack at all and every drop is a real decision.
+// It stays (just) on screen, and always goes far enough past the stack that a total miss is possible.
 export function travelRange(width, top, t = TUNING) {
-  return { min: top.x - width - t.CLEAR, max: top.x + top.w + t.CLEAR }
+  const min = Math.max(top.x - width - t.SWING, -width + t.EDGE_SHOW)
+  const max = Math.min(top.x + top.w + t.SWING, t.FIELD - t.EDGE_SHOW)
+  return { min: Math.min(min, top.x - width - t.CLEAR), max: Math.max(max, top.x + top.w + t.CLEAR) }
 }
 
 // A new game: one book already on the base, the next one about to slide in.
