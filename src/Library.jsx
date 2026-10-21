@@ -3,10 +3,11 @@ import { supabase, friendlyError } from './supabase.js'
 import Wordmark from './Wordmark.jsx'
 import Bookcase from './Bookcase.jsx'
 import BookListing from './BookListing.jsx'
+import BookModal from './BookModal.jsx'
 import LibraryCard from './LibraryCard.jsx'
 import AvatarPicker, { AvatarBadge } from './AvatarPicker.jsx'
 import { bookcaseTones, scoreMembers, shelfCopies } from './shelf.js'
-import { AddBook, CopyRow, Empty, ReadingControls, ScoreLine, Verdicts, isStarred, joinNames } from './parts.jsx'
+import { AddBook, Empty, ScoreLine, joinNames } from './parts.jsx'
 
 export { POINTS } from './shelf.js'
 
@@ -56,6 +57,9 @@ export default function Library({ group, groups, profile, notice, clearNotice, o
   const [toast, setToast] = useState('')
   const toastTimer = useRef()
   const listingHeadingRef = useRef(null)
+  const [modalCopyId, setModalCopyId] = useState(null)   // book open from the All books list
+  const tileRefs = useRef({})
+  const lastTile = useRef(null)
   const searchRef = useRef(null)
   const focusSearch = useRef(false)
 
@@ -238,6 +242,26 @@ export default function Library({ group, groups, profile, notice, clearNotice, o
   // Default to the first book on your shelf (or anyone's) until a spine is picked.
   const defaultEntry = shelfCopies(all, me)[0] || members.map((m) => shelfCopies(all, m.id)[0]).find(Boolean) || null
   const entry = findEntry(selectedCopyId) || defaultEntry
+
+  // Which copy to open from a title in the list: theirs if you're looking at someone's
+  // shelf, else yours, else one that's free to borrow, else the first.
+  function pickCopy(book) {
+    const cs = [...book.copies].sort((a, b) => a.created_at.localeCompare(b.created_at))
+    return (person && cs.find((c) => c.owner_id === person))
+      || cs.find((c) => c.owner_id === me)
+      || cs.find((c) => c.status === 'home' && c.lendable)
+      || cs[0]
+  }
+  function openFromList(book) {
+    lastTile.current = book.id
+    setModalCopyId(pickCopy(book).id)
+  }
+  const closeModal = useCallback(() => {
+    setModalCopyId(null)
+    const t = tileRefs.current[lastTile.current]
+    if (t) requestAnimationFrame(() => t.focus())
+  }, [])
+  const modalEntry = findEntry(modalCopyId)
 
   function openCopy(id) {
     setSelectedCopyId(id)
@@ -424,11 +448,31 @@ export default function Library({ group, groups, profile, notice, clearNotice, o
               q ? <Empty title={`No one has “${query.trim()}”`}>Check the spelling, or try the author's name.</Empty>
                 : <Empty title="Nothing here yet">{person ? 'Nothing in this part of their shelf yet.' : 'Try a different filter.'}</Empty>
             ) : (
-              visible.map((b) => (
-                <BookCard key={b.id} book={b} me={me} members={members} nameOf={nameOf} actions={actions} />
-              ))
+              <ul className="title-grid">
+                {visible.map((b) => (
+                  <li key={b.id}>
+                    <button type="button" className="title-tile" ref={(el) => (tileRefs.current[b.id] = el)} onClick={() => openFromList(b)}>
+                      <span className="tile-title">{b.title}</span>
+                      {b.author && <span className="tile-author">{b.author}</span>}
+                    </button>
+                  </li>
+                ))}
+              </ul>
             )}
           </section>
+          {modalEntry && (
+            <BookModal
+              entry={modalEntry}
+              copies={[...modalEntry.book.copies].sort((a, b) => (b.owner_id === me) - (a.owner_id === me) || a.created_at.localeCompare(b.created_at))}
+              onPickCopy={setModalCopyId}
+              onClose={closeModal}
+              me={me}
+              myName={profile.display_name}
+              nameOf={nameOf}
+              tones={tones}
+              listingProps={{ members, actions, showToast }}
+            />
+          )}
         </main>
       )}
 
@@ -484,31 +528,6 @@ function ForYou({ books, me, nameOf, actions }) {
         ))}
       </ul>
     </section>
-  )
-}
-
-function BookCard({ book, me, members, nameOf, actions }) {
-  const copies = [...book.copies].sort((a, b) => (b.owner_id === me) - (a.owner_id === me) || a.created_at.localeCompare(b.created_at))
-  return (
-    <article className="card">
-      <div>
-        <h2 className="title">
-          {book.title}
-          {isStarred(book, members) && <span className="star" title="Everyone in the library has read this">★ Read by everyone</span>}
-        </h2>
-        {book.author && <p className="author">{book.author}</p>}
-      </div>
-
-      <Verdicts book={book} nameOf={nameOf} />
-
-      <div className="copies">
-        {copies.map((c) => (
-          <CopyRow key={c.id} copy={c} me={me} members={members} nameOf={nameOf} actions={actions} />
-        ))}
-      </div>
-
-      <ReadingControls book={book} me={me} actions={actions} />
-    </article>
   )
 }
 
