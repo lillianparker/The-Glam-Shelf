@@ -3,24 +3,26 @@
 /* Tokens. Warm paper + cream surfaces, berry ink for actions, and an illustrated
    bookcase palette (pink, cream, wine, muted gold, sage, blue, plum) for spines and covers. */
 :root {
-  --bg: #f5efe6;            /* warm paper */
-  --surface: #fffaf2;       /* cream */
-  --ink: #2a1a20;
-  --muted: #73636a;
-  --line: #e2d5c8;
-  --accent: #a3194f;        /* berry */
-  --accent-ink: #ffffff;
-  --accent-soft: #f8dbe5;
-  --gold: #8a6416;          /* muted gold, dark enough for text */
-  --gold-soft: #f3e7cf;
-  --sage: #4f6b45;
-  --sage-soft: #e3ebdc;
-  --danger: #b3261e;
-  --wine: #4a1f30;
-  --card-pink: #f8d6e2;
-  --outline: #2a1a20;       /* the illustrated line */
-  --board: #ead9c4;
-  --board-edge: #c9ae94;
+  --bg: #2a1c1c;            /* warm paper */
+  --surface: #3a2725;       /* cream */
+  --ink: #f6eadb;
+  --muted: #c9b2a1;
+  --line: #55403a;
+  --accent: #f28fb3;        /* berry */
+  --accent-ink: #2a1c1c;
+  --accent-soft: #53303c;
+  --gold: #e6c27a;          /* muted gold, dark enough for text */
+  --gold-soft: #4b3226;
+  --sage: #aecb9f;
+  --sage-soft: #33402d;
+  --page-glow: #432c27;     /* the warm lamp light at the top of the page */
+  --panel-shadow: rgba(10, 5, 5, 0.45);
+  --danger: #ff9d8f;
+  --wine: #5c1f34;
+  --card-pink: #f6d9e3;
+  --outline: #160e0e;       /* the illustrated line */
+  --board: #8c5f42;
+  --board-edge: #4f3324;
 
   /* spine + cover tones: the same in light and dark */
   --sp-pink: #ec8db1;
@@ -47,36 +49,12 @@
   --f-display: "Bodoni Moda", "Didot", "Bodoni 72", Georgia, serif;
   --f-body: "Figtree", system-ui, -apple-system, "Segoe UI", sans-serif;
   --f-mono: "DM Mono", ui-monospace, Menlo, monospace;
-  color-scheme: light;
+  color-scheme: dark;
 }
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #1b1214;
-    --surface: #251a1d;
-    --ink: #f4e7ec;
-    --muted: #b59ba7;
-    --line: #3b2a30;
-    --accent: #f06c9e;
-    --accent-ink: #1b1214;
-    --accent-soft: #3d1d2b;
-    --gold: #e3be72;
-    --gold-soft: #3a2e17;
-    --sage: #a9c79c;
-    --sage-soft: #26321f;
-    --danger: #ff8a80;
-    --wine: #2c1019;
-    --card-pink: #3a2230;
-    --outline: #0d0809;
-    --board: #4b382e;
-    --board-edge: #2a1e18;
-    color-scheme: dark;
-  }
-}
-
 * { box-sizing: border-box; }
 html, body { margin: 0; }
 body {
-  background: var(--bg);
+  background: radial-gradient(ellipse 120% 600px at 50% -120px, var(--page-glow), transparent 70%) no-repeat, var(--bg);
   color: var(--ink);
   font: 15px/1.5 var(--f-body);
   padding-top: env(safe-area-inset-top, 0px);
@@ -457,7 +435,8 @@ svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width:
 .bookcase {
   background: var(--surface); border: 1px solid var(--line); border-radius: 22px;
   padding-bottom: 20px; overflow: hidden;
-  box-shadow: 0 16px 45px color-mix(in srgb, var(--ink) 7%, transparent);
+  box-shadow: 0 18px 50px var(--panel-shadow), inset 0 1px 0 color-mix(in srgb, var(--ink) 6%, transparent);
+  background-image: linear-gradient(180deg, color-mix(in srgb, var(--ink) 3%, transparent), transparent 140px);
 }
 .bookcase-head {
   display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 10px 20px;
@@ -556,6 +535,7 @@ svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width:
 
 /* ---------- listing + library card ---------- */
 .content-grid { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(270px, 0.7fr); gap: 24px; align-items: start; }
+.content-grid.card-only > .library-card { grid-column: 2; } /* no book picked yet: the card keeps its place on the right */
 .listing {
   background: var(--surface); border: 1px solid var(--line); border-radius: 22px; padding: 30px;
   display: grid; grid-template-columns: 210px minmax(0, 1fr); gap: 32px; scroll-margin-top: 16px;
@@ -637,6 +617,9 @@ svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width:
 .log-icon svg { width: 15px; height: 15px; }
 
 .library-card {
+  /* a light paper card on a dark desk: its own text colours */
+  --ink: #2a1a20; --muted: #6a5059; --accent: #a3194f; --accent-soft: #f8dbe5; --surface: #fff7f9; --line: #e7c9d3; --sp-pink: #f6c1d4;
+  color: var(--ink);
   background: var(--card-pink); border: 1.5px solid var(--outline); border-radius: 17px; overflow: hidden;
   transform: rotate(1deg); box-shadow: 8px 9px 0 var(--outline);
 }
@@ -666,6 +649,7 @@ svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width:
   .topbar { grid-template-columns: 1fr auto; }
   .topbar nav { grid-column: 1 / -1; grid-row: 2; gap: 22px; overflow-x: auto; }
   .content-grid { grid-template-columns: 1fr; }
+  .content-grid.card-only > .library-card { grid-column: auto; }
   .library-card { max-width: 440px; transform: none; }
 }
 @media (max-width: 620px) {
@@ -686,17 +670,16 @@ svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width:
 }
 /* ---------- avatars ---------- */
 .avatar-badge {
-  display: inline-grid; place-items: center; flex-shrink: 0; overflow: hidden;
+  display: inline-grid; place-items: center; flex-shrink: 0; overflow: hidden; position: relative;
   width: 22px; height: 22px; border-radius: 50%;
   background: var(--surface); border: 1px solid var(--line);
   font: 600 11px var(--f-body); color: var(--muted);
 }
-.avatar-badge img { width: 82%; height: 82%; object-fit: contain; }
+/* pinned in a box in the middle of the circle, small enough that the whole object fits inside the round edge */
+.avatar-badge img { position: absolute; inset: 16%; width: 68%; height: 68%; object-fit: contain; }
 .avatar-badge.md { width: 38px; height: 38px; font-size: 15px; }
 .avatar-badge.lg { width: 60px; height: 60px; font-size: 22px; border-color: var(--outline); background: var(--surface); }
 .avatar-badge.none { background: var(--accent-soft); color: var(--accent); border-color: transparent; }
-.avatar-badge { ...; position: relative; }
-.avatar-badge img { position: absolute; inset: 16%; width: 68%; height: 68%; object-fit: contain; }
 .members button { display: inline-flex; align-items: center; gap: 7px; padding-left: 4px; }
 .members .avatar-badge { margin-right: 0; }
 .avatar-button { background: none; border: 0; padding: 0; border-radius: 50%; cursor: pointer; display: grid; }

@@ -331,8 +331,8 @@ export default function Library({ group, groups, profile, notice, clearNotice, o
             onRetry={load}
           />
 
-          <div className="content-grid">
-            {books !== null && (
+          <div className={`content-grid${entry ? '' : ' card-only'}`}>
+            {entry && (
               <BookListing
                 key={entry?.copy.id || 'none'}
                 ref={listingHeadingRef}
@@ -344,7 +344,6 @@ export default function Library({ group, groups, profile, notice, clearNotice, o
                 nameOf={nameOf}
                 actions={actions}
                 showToast={showToast}
-                onAddBook={() => { setAddOpen(true); window.scrollTo?.({ top: 0 }) }}
               />
             )}
             <LibraryCard name={profile.display_name} avatar={profile.avatar} libraryName={group.name} joinedAt={myMember?.joinedAt} score={scores[me]} />
@@ -610,3 +609,4 @@ function AccountMenu({ profile, onProfileChange, showToast }) {
     </div>
   )
 }
+
