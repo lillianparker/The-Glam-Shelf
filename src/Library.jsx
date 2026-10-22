@@ -5,11 +5,11 @@ import Bookcase from './Bookcase.jsx'
 import BookListing from './BookListing.jsx'
 import BookModal from './BookModal.jsx'
 import Play from './Play.jsx'
-import Activity, { WantedFromShelf } from './Activity.jsx'
 import LibraryCard from './LibraryCard.jsx'
 import AvatarPicker, { AvatarBadge } from './AvatarPicker.jsx'
 import { bookcaseTones, compareTitles, scoreMembers, shelfCopies } from './shelf.js'
 import { cardNumber, rankBoard, withRound } from './leaderboard.js'
+import { findCover } from './covers.js'
 import { AddBook, Empty, ScoreLine, joinNames } from './parts.jsx'
 
 export { POINTS } from './shelf.js'
@@ -30,6 +30,19 @@ const HOMEPAGE_TEXT = 'Search for books, upload ones you own, and borrow from fr
 
 // Members with their names and avatars. If the avatar column doesn't exist yet
 // (update-5.sql not run), load without it so nothing else breaks.
+// Books with their copies, line, loans and reading. If the cover columns don't exist yet
+// (update-9.sql not run), load without them so nothing else breaks.
+const COPY_FIELDS =
+  'copies(id, owner_id, status, lendable, lent_to_user, lent_to_name, lent_at, created_at, item_id, everywhere, queue(user_id, sort_key, joined_at), loans(id, borrower_id, borrower_name, lent_at, returned_at)), ' +
+  'reading(user_id, status, rating)'
+async function loadBooks(groupId) {
+  const res = await supabase.from('books').select('id, title, author, cover_id, cover_looked, ' + COPY_FIELDS).eq('group_id', groupId)
+  if (res.error && /cover/i.test(res.error.message || '')) {
+    return supabase.from('books').select('id, title, author, ' + COPY_FIELDS).eq('group_id', groupId)
+  }
+  return res
+}
+
 async function loadMembers(groupId) {
   const res = await supabase.from('group_members').select('user_id, joined_at, profiles(display_name, avatar)').eq('group_id', groupId)
   if (res.error && /avatar/i.test(res.error.message || '')) {
@@ -78,14 +91,7 @@ export default function Library({ group, groups, profile, notice, clearNotice, o
 
   const load = useCallback(async () => {
     const [b, m] = await Promise.all([
-      supabase
-        .from('books')
-        .select(
-          'id, title, author, ' +
-          'copies(id, owner_id, status, lendable, lent_to_user, lent_to_name, lent_at, created_at, item_id, everywhere, queue(user_id, sort_key, joined_at), loans(id, borrower_id, borrower_name, lent_at, returned_at)), ' +
-          'reading(user_id, status, rating, updated_at)'
-        )
-        .eq('group_id', group.id),
+      loadBooks(group.id),
       loadMembers(group.id),
     ])
     // The leaderboard loads on its own, so the library still works before update-8.sql is run.
@@ -103,7 +109,7 @@ export default function Library({ group, groups, profile, notice, clearNotice, o
         c.queue.sort((x, y) => x.sort_key - y.sort_key || x.joined_at.localeCompare(y.joined_at))
         // chronological (oldest first), the order the library log reads
         c.loans = [...(c.loans || [])].sort((x, y) => x.lent_at.localeCompare(y.lent_at))
-        c.book = { id: book.id, title: book.title, author: book.author }
+        c.book = { id: book.id, title: book.title, author: book.author, cover_id: book.cover_id ?? null }
       }
     }
     setBooks(b.data.sort((x, y) => compareTitles(x.title, y.title)))
@@ -143,7 +149,20 @@ export default function Library({ group, groups, profile, notice, clearNotice, o
     return true
   }
 
+  // Look up a book's cover the first time anyone opens it, and save it for everyone.
+  const coverTried = useRef(new Set())
+  const findBookCover = useCallback(async (book) => {
+    if (book.cover_looked !== false || coverTried.current.has(book.id)) return
+    coverTried.current.add(book.id)
+    let coverId
+    try { coverId = await findCover(book.title, book.author) } catch { return }   // Open Library unreachable: try again next visit
+    const { error } = await supabase.from('books').update({ cover_id: coverId, cover_looked: true }).eq('id', book.id).eq('cover_looked', false)
+    if (error) return
+    setBooks((bs) => bs && bs.map((b) => (b.id === book.id ? { ...b, cover_id: coverId, cover_looked: true } : b)))
+  }, [])
+
   const actions = {
+    findCover: findBookCover,
     addCopy: async (title, author, everywhere = false) => {
       let res = await supabase.rpc('add_copy', { gid: group.id, book_title: title, book_author: author, everywhere })
       if (res.error && /add_copy|function/i.test(res.error.message || '')) {
@@ -298,7 +317,6 @@ export default function Library({ group, groups, profile, notice, clearNotice, o
     if (el && el.isConnected) requestAnimationFrame(() => el.focus())
   }, [])
   const modalEntry = findEntry(modalCopyId)
-  const openActivityCopy = useCallback((copyId, el) => { if (copyId) openModal(copyId, null, el) }, [])
 
   function openCopy(id) {
     setSelectedCopyId(id)
@@ -332,7 +350,6 @@ export default function Library({ group, groups, profile, notice, clearNotice, o
     ['bookcase', 'Bookcase', view === 'home' && !expandedOwner, () => go('home')],
     ['mine', 'My shelf', view === 'home' && expandedOwner === me, () => go('home', { expand: me })],
     ['all', 'All books', view === 'all', () => go('all')],
-    ['activity', 'Activity', view === 'activity', () => go('activity')],
     ['play', 'Play', view === 'play', () => go('play')],
   ]
 
@@ -379,7 +396,6 @@ export default function Library({ group, groups, profile, notice, clearNotice, o
       {view === 'home' ? (
         <main className="home stack-lg">
           <h1 className="sr-only">{group.name} bookcase</h1>
-          <WantedFromShelf books={books} me={me} nameOf={nameOf} onOpen={openActivityCopy} />
           <section className="intro">
             <div>              
               <p>{HOMEPAGE_TEXT}</p>
@@ -432,8 +448,6 @@ export default function Library({ group, groups, profile, notice, clearNotice, o
             <LibraryCard name={profile.display_name} avatar={profile.avatar} libraryName={group.name} joinedAt={myMember?.joinedAt} score={scores[me]} cardNo={cardNumber(board, me)} />
           </div>
         </main>
-      ) : view === 'activity' ? (
-        <Activity books={books} me={me} nameOf={nameOf} onOpen={openActivityCopy} />
       ) : view === 'play' ? (
         <Play libraryName={group.name} groupId={group.id} me={me} books={books} board={gameScores === null ? null : board} onScore={recordScore} />
       ) : (
@@ -614,7 +628,7 @@ function GroupBar({ group, groups, members, scores, me, profile, person, onOpenS
       </div>
       <div className="group-actions">
         <button type="button" className="btn small" onClick={copy}>Copy invite link</button>
-        <button type="button" className="btn small ghost" onClick={() => setCreating((v) => !v)}>New library</button>
+        <button type="button" className="btn small ghost" onClick={() => setCreating((v) => !v)}>New library group</button>
       </div>
       <ul className="members" aria-label="Members">
         {[...members]

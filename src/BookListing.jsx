@@ -3,12 +3,15 @@ import { forwardRef, useCallback, useEffect, useRef, useState } from 'react'
 import { supabase, friendlyError } from './supabase.js'
 import { CopyRow, ReadingControls, Verdicts, fmtDate, isStarred } from './parts.jsx'
 import { availabilityText, libraryLog, possessive, spineTone } from './shelf.js'
+import { coverUrl } from './covers.js'
 
 const BookListing = forwardRef(function BookListing({ entry, tone, idBase = 'listing', me, myName, members, nameOf, actions, showToast, onAddBook }, headingRef) {
   const [tab, setTab] = useState('comments')
   const tabsRef = useRef([])
   const copyId = entry?.copy.id
   useEffect(() => { setTab('comments') }, [copyId])
+  const book0 = entry?.book
+  useEffect(() => { if (book0) actions?.findCover?.(book0) }, [book0?.id, book0?.cover_looked])   // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!entry) {
     return (
@@ -28,7 +31,7 @@ const BookListing = forwardRef(function BookListing({ entry, tone, idBase = 'lis
   const ownerName = isOwner ? myName : nameOf(copy.owner_id)
   const where = availabilityText(copy, me, nameOf)
   const tabs = [
-    ['comments', 'Reviews'],
+    ['comments', 'Thoughts on this book'],
     ['log', 'Library log'],
   ]
 
@@ -44,7 +47,7 @@ const BookListing = forwardRef(function BookListing({ entry, tone, idBase = 'lis
   return (
     <article className="listing" aria-labelledby={`${idBase}-title`}>
       <div className="cover-col">
-        <BookCover title={book.title} author={book.author} tone={tone || spineTone(copy.id)} />
+        <BookCover title={book.title} author={book.author} coverId={book.cover_id} tone={tone || spineTone(copy.id)} />
         <Comments copy={copy} me={me} isOwner={isOwner} nameOf={nameOf} myName={myName} showToast={showToast} />
       </div>
       <div className="book-copy">
@@ -107,12 +110,24 @@ const BookListing = forwardRef(function BookListing({ entry, tone, idBase = 'lis
 
 export default BookListing
 
-export function BookCover({ title, author, tone }) {
+// The cover: the real one from Open Library when we have it, drawn on top of our own
+// colored cover. While the picture loads, or if it can't, you see the colored one.
+export function BookCover({ title, author, tone, coverId = null }) {
+  const [status, setStatus] = useState('loading')   // 'loading' | 'shown' | 'failed'
+  useEffect(() => { setStatus('loading') }, [coverId])
+  const photo = coverId && status !== 'failed'
   return (
-    <div className={`cover tone-${tone}`} aria-hidden="true">
+    <div className={`cover tone-${tone}${photo && status === 'shown' ? ' has-photo' : ''}`} aria-hidden="true">
       <span>GLAM BOOKSHELF</span>
       <strong>{title}</strong>
       {author && <i>by {author}</i>}
+      {photo && (
+        <img
+          className="cover-photo" src={coverUrl(coverId, 'L')} alt=""
+          onLoad={(e) => setStatus(e.currentTarget.naturalWidth > 1 ? 'shown' : 'failed')}
+          onError={() => setStatus('failed')}
+        />
+      )}
     </div>
   )
 }
@@ -196,7 +211,7 @@ export function Comments({ copy, me, isOwner, nameOf, myName, showToast }) {
   return (
     <section className="margins" aria-label="The margins: notes from readers">
       <button type="button" className="margins-toggle" aria-expanded={open} aria-controls={panelId} onClick={() => toggle(!open)}>
-        <span className="margins-label">{open ? 'Hide margin notes' : 'Add margin notes'}</span>
+        <span className="margins-label">{open ? 'Close the margins' : 'See the margins'}</span>
         <span className="margins-count">{count}</span>
       </button>
       {open && (
