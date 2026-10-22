@@ -1,17 +1,30 @@
-// The listing that opens when you pick a spine: one physical copy, in detail.
-import { forwardRef, useCallback, useEffect, useRef, useState } from 'react'
+// The book listing as an index card: the cover taped on the left, and the basics written
+// on the ruled lines. "edit" turns to your side of the card: your status and take,
+// your spine color (owner), a note in the margins, and the owner's tools.
+// Every line of text sits on the card's rules: long text wraps onto the next rule,
+// it never stretches the spacing.
+import { forwardRef, useCallback, useEffect, useState } from 'react'
 import { supabase, friendlyError } from './supabase.js'
-import { CopyRow, ReadingControls, Verdicts, fmtDate, isStarred } from './parts.jsx'
-import { availabilityText, libraryLog, possessive, spineTone } from './shelf.js'
+import { CopyRow, fmtDate, isStarred } from './parts.jsx'
+import { SPINE_TONES, libraryLog, possessive, spineTone } from './shelf.js'
 import { coverUrl } from './covers.js'
 
-const BookListing = forwardRef(function BookListing({ entry, tone, idBase = 'listing', me, myName, members, nameOf, actions, showToast, onAddBook }, headingRef) {
-  const [tab, setTab] = useState('comments')
-  const tabsRef = useRef([])
+// Your side of the card. (The values match the database: reading.status and reading.rating.)
+const MY_STATUSES = [['want', 'want to read'], ['reading', 'am reading'], ['read', 'read'], ['dnf', 'DNF’d']]
+const MY_VERDICTS = [['up', 'loved it'], ['good', 'liked it'], ['meh', 'it was fine'], ['down', 'it wasn’t for me']]
+// How a verdict reads about someone on the front of the card.
+const VERDICT_SAID = { up: 'loved it', good: 'liked it', meh: 'thought it was fine', down: 'didn’t love it' }
+
+const BookListing = forwardRef(function BookListing(
+  { entry, tone, idBase = 'listing', me, myName, members, nameOf, actions, showToast, onAddBook, startEditing = false },
+  headingRef,
+) {
   const copyId = entry?.copy.id
-  useEffect(() => { setTab('comments') }, [copyId])
+  const [editing, setEditing] = useState(startEditing)
+  useEffect(() => { setEditing(startEditing) }, [copyId])   // eslint-disable-line react-hooks/exhaustive-deps
   const book0 = entry?.book
   useEffect(() => { if (book0) actions?.findCover?.(book0) }, [book0?.id, book0?.cover_looked])   // eslint-disable-line react-hooks/exhaustive-deps
+  const margins = useMargins(entry?.copy.id, me, showToast)
 
   if (!entry) {
     return (
@@ -28,87 +41,278 @@ const BookListing = forwardRef(function BookListing({ entry, tone, idBase = 'lis
 
   const { copy, book } = entry
   const isOwner = copy.owner_id === me
-  const ownerName = isOwner ? myName : nameOf(copy.owner_id)
-  const where = availabilityText(copy, me, nameOf)
-  const tabs = [
-    ['comments', 'Thoughts on this book'],
-    ['log', 'Library log'],
-  ]
-
-  // Arrow keys move between tabs (standard tab pattern).
-  function onTabKey(e, i) {
-    if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return
-    e.preventDefault()
-    const j = (i + (e.key === 'ArrowRight' ? 1 : -1) + tabs.length) % tabs.length
-    setTab(tabs[j][0])
-    tabsRef.current[j]?.focus()
-  }
+  const shownTone = tone || spineTone(copy.id)
 
   return (
-    <article className="listing" aria-labelledby={`${idBase}-title`}>
-      <div className="cover-col">
-        <BookCover title={book.title} author={book.author} coverId={book.cover_id} tone={tone || spineTone(copy.id)} />
-        <Comments copy={copy} me={me} isOwner={isOwner} nameOf={nameOf} myName={myName} showToast={showToast} />
-      </div>
-      <div className="book-copy">
-        <span className="eyebrow">{isOwner ? 'From your shelf' : `From ${possessive(ownerName)} shelf`}</span>
-        <h2 id={`${idBase}-title`} ref={headingRef} tabIndex={-1}>
-          {book.title}
-          {isStarred(book, members) && <span className="star" title="Everyone in the library has read this">★ Read by everyone</span>}
-        </h2>
-        {book.author && <p className="author">by {book.author}</p>}
+    <article className={`index-card${editing ? ' editing' : ''}`} aria-labelledby={`${idBase}-title`}>
+      <header className="card-head">
+        <h2 id={`${idBase}-title`} ref={headingRef} tabIndex={-1} className="card-title">{book.title}</h2>
+        {isStarred(book, members) && <span className="star" title="Everyone in the library has read this">★ Read by everyone</span>}
+        <span className="card-mode">
+          {editing && <span className="card-editing">editing</span>}
+          <button type="button" className="card-toggle" aria-expanded={editing} onClick={() => setEditing((v) => !v)}>
+            {editing ? 'done' : 'edit'}
+          </button>
+        </span>
+      </header>
 
-        <div className="tabs" role="tablist" aria-label="About this copy">
-          {tabs.map(([key, label], i) => (
-            <button
-              key={key}
-              ref={(el) => (tabsRef.current[i] = el)}
-              type="button"
-              role="tab"
-              id={`${idBase}-tab-${key}`}
-              aria-selected={tab === key}
-              aria-controls={`${idBase}-panel-${key}`}
-              tabIndex={tab === key ? 0 : -1}
-              className={tab === key ? 'active' : ''}
-              onClick={() => setTab(key)}
-              onKeyDown={(e) => onTabKey(e, i)}
-            >{label}</button>
-          ))}
+      <div className="card-body">
+        <div className="card-cover">
+          <BookCover title={book.title} author={book.author} coverId={book.cover_id} tone={shownTone} />
+          <i className="tape" aria-hidden="true" />
         </div>
-
-        {tab === 'comments' ? (
-          <div className="details-panel" role="tabpanel" id={`${idBase}-panel-comments`} aria-labelledby={`${idBase}-tab-comments`}>
-            <dl className="facts">
-              <div><dt>Owner</dt><dd>{isOwner ? `${myName} (you)` : ownerName}</dd></div>
-              <div>
-                <dt>Location</dt>
-                <dd className={`availability ${copy.status === 'lent' ? 'out' : 'in'}`}>
-                  <i aria-hidden="true" />{where}{copy.status === 'lent' && copy.lent_at ? ` since ${fmtDate(copy.lent_at)}` : ''}
-                </dd>
-              </div>
-              <div>
-                <dt>Availability</dt>
-                <dd>{!copy.lendable ? 'Not lending right now' : copy.status === 'lent' ? 'Out on loan' : isOwner ? 'On your shelf' : 'Available to borrow'}{copy.queue.length > 0 ? ` · ${copy.queue.length} in line` : ''}</dd>
-              </div>
-            </dl>
-
-            <CopyRow copy={copy} me={me} members={members} nameOf={nameOf} actions={actions} compact hideHistory />
-
-            <Verdicts book={book} nameOf={nameOf} />
-            <ReadingControls book={book} me={me} actions={actions} layout="labeled" />
-
-          </div>
-        ) : (
-          <div className="log-panel" role="tabpanel" id={`${idBase}-panel-log`} aria-labelledby={`${idBase}-tab-log`}>
-            <LibraryLog copy={copy} nameOf={nameOf} />
-          </div>
-        )}
+        <div className="card-lines">
+          {editing ? (
+            <MySide book={book} copy={copy} me={me} isOwner={isOwner} tone={shownTone} members={members}
+              nameOf={nameOf} actions={actions} margins={margins} />
+          ) : (
+            <FrontSide book={book} copy={copy} me={me} myName={myName} isOwner={isOwner} nameOf={nameOf}
+              actions={actions} margins={margins} idBase={idBase} />
+          )}
+        </div>
       </div>
     </article>
   )
 })
 
 export default BookListing
+
+// ---------------------------------------------------------------------------
+// The front: who's read it, where the copy is, the margins and the log
+// ---------------------------------------------------------------------------
+
+function FrontSide({ book, copy, me, myName, isOwner, nameOf, actions, margins, idBase }) {
+  const rows = summarize(book.reading || [], me, nameOf)
+  const [open, setOpen] = useState(() => { try { return localStorage.getItem('glam_margins_open') === '1' } catch { return false } })
+  const toggleMargins = () => {
+    setOpen((v) => { try { localStorage.setItem('glam_margins_open', v ? '0' : '1') } catch { /* private mode */ } return !v })
+  }
+  const [logOpen, setLogOpen] = useState(false)
+  const latest = margins.items?.length ? margins.items[margins.items.length - 1] : null
+  const by = (uid) => (uid === me ? 'you' : nameOf(uid))
+
+  return (
+    <>
+      {book.author && <p className="card-line card-by">by {book.author}</p>}
+
+      {rows.length ? rows.map((segs, i) => (
+        <p className="card-line" key={i}>{segs.map((s, j) => <Seg key={j} s={s} />)}</p>
+      )) : <p className="card-line card-quiet">Nobody’s marked this one yet.</p>}
+
+      <CopyLine copy={copy} me={me} isOwner={isOwner} nameOf={nameOf} actions={actions} />
+
+      <p className="card-line">
+        In the margins:{' '}
+        {margins.missing ? <span className="card-quiet">(needs update-4.sql)</span>
+          : margins.items === null ? <span className="card-quiet">…</span>
+          : latest ? (
+            <>
+              {!open && <><span className="card-note">{latest.body}</span> <span className="card-note-by">— {by(latest.user_id)}</span>{' '}</>}
+              <button type="button" className="card-link" aria-expanded={open} onClick={toggleMargins}>
+                {open ? 'hide the margins' : margins.items.length > 1 ? `see all ${margins.items.length}` : 'see it'}
+              </button>
+            </>
+          ) : <span className="card-quiet">nothing yet</span>}
+      </p>
+      {open && margins.items?.length > 0 && (
+        <ul className="card-notes" aria-label="The margins: notes from readers">
+          {margins.items.map((c) => (
+            <MarginNote key={c.id} c={c} me={me} myName={myName} nameOf={nameOf} isOwner={isOwner} remove={margins.remove} />
+          ))}
+        </ul>
+      )}
+
+      <p className="card-line">
+        <button type="button" className="card-link" aria-expanded={logOpen} aria-controls={`${idBase}-log`} onClick={() => setLogOpen((v) => !v)}>
+          {logOpen ? 'hide the library log' : 'Library log'}
+        </button>
+      </p>
+      {logOpen && <LibraryLog id={`${idBase}-log`} copy={copy} nameOf={nameOf} />}
+    </>
+  )
+}
+
+function Seg({ s }) {
+  return s.tab ? <><mark className="tab">{s.t}</mark>{' '}</> : <>{s.t}{' '}</>
+}
+
+// Everyone's take, one line per group: "Nat & Anna [read] and [loved it]".
+export function summarize(reading, me, nameOf) {
+  const names = (rows) => {
+    const ns = [...rows].sort((a, b) => (a.user_id === me) - (b.user_id === me)).map((r) => (r.user_id === me ? 'you' : nameOf(r.user_id)))
+    const s = ns.length === 1 ? ns[0] : ns.length === 2 ? `${ns[0]} & ${ns[1]}` : `${ns.slice(0, -1).join(', ')} & ${ns[ns.length - 1]}`
+    return s.charAt(0).toUpperCase() + s.slice(1)
+  }
+  const t = (x) => ({ t: x })
+  const tab = (x) => ({ t: x, tab: true })
+  const pick = (fn) => reading.filter(fn)
+  const lines = []
+  for (const v of ['up', 'good', 'meh', 'down']) {
+    const g = pick((r) => r.status === 'read' && r.rating === v)
+    if (g.length) lines.push([t(names(g)), tab('read'), t('and'), tab(VERDICT_SAID[v])])
+  }
+  const read = pick((r) => r.status === 'read' && !r.rating)
+  if (read.length) lines.push([t(names(read)), tab('read'), t('it')])
+  const reading_ = pick((r) => r.status === 'reading')
+  if (reading_.length) {
+    const solo = reading_.length === 1
+    const lead = solo ? (reading_[0].user_id === me ? 'You’re' : `${names(reading_)} is`) : `${names(reading_)} are`
+    lines.push([t(lead), tab('currently reading')])
+  }
+  const dnf = pick((r) => r.status === 'dnf')
+  if (dnf.length) lines.push([t(names(dnf)), tab('didn’t finish'), t('it')])
+  const want = pick((r) => r.status === 'want')
+  if (want.length) {
+    const third = want.length === 1 && want[0].user_id !== me
+    lines.push([t(names(want)), tab(third ? 'wants to read' : 'want to read'), t('it')])
+  }
+  return lines
+}
+
+// "Ted’s copy is [with Fred since Oct 12]" plus what you can do about it.
+function CopyLine({ copy, me, isOwner, nameOf, actions }) {
+  const owner = nameOf(copy.owner_id)
+  const line = copy.queue || []
+  const next = line[0]?.user_id
+  const myPlace = line.findIndex((q) => q.user_id === me)
+  const isHolder = copy.lent_to_user === me
+  const holder = copy.lent_to_user ? (isHolder ? 'you' : nameOf(copy.lent_to_user)) : copy.lent_to_name || 'a friend'
+  const where = copy.status === 'lent'
+    ? `with ${holder}${copy.lent_at ? ` since ${fmtDate(copy.lent_at)}` : ''}`
+    : isOwner ? 'at home' : `at ${possessive(owner)}`
+
+  const doing = []
+  if (isOwner) {
+    if (copy.status === 'home' && next) doing.push(<button key="pass" type="button" className="card-link" onClick={() => actions.passOn(copy)}>gave it to {nameOf(next)}</button>)
+  } else if (isHolder) {
+    if (next) doing.push(<button key="pass" type="button" className="card-link" onClick={() => actions.passOn(copy)}>gave it to {nameOf(next)}</button>)
+    doing.push(<button key="back" type="button" className="card-link" onClick={() => actions.setHome(copy)}>gave it back to {owner}</button>)
+  } else if (myPlace >= 0) {
+    doing.push(<span key="place" className="card-quiet">{myPlace === 0 ? 'you’re next in line' : `you’re #${myPlace + 1} in line`}</span>)
+    doing.push(<button key="leave" type="button" className="card-link" onClick={() => actions.leaveLine(copy)}>leave the line</button>)
+  } else if (copy.lendable) {
+    doing.push(<button key="join" type="button" className="card-link" onClick={() => actions.joinLine(copy)}>get in line</button>)
+    if (copy.status === 'home' && line.length === 0) {
+      doing.push(<button key="took" type="button" className="card-link" onClick={() => actions.lendTo(copy, me)}>I already borrowed it</button>)
+    }
+  }
+
+  return (
+    <p className="card-line">
+      {isOwner ? 'Your' : possessive(owner)} copy is <mark className="tab plain">{where}</mark>{' '}
+      {!copy.lendable && <><mark className="tab plain">not lending right now</mark>{' '}</>}
+      {line.length > 0 && !isOwner && myPlace < 0 && <span className="card-quiet">· {line.length} in line </span>}
+      {doing.map((d, i) => <span key={i}>{d}{' '}</span>)}
+    </p>
+  )
+}
+
+function MarginNote({ c, me, myName, nameOf, isOwner, remove }) {
+  const [confirming, setConfirming] = useState(false)
+  const mine = c.user_id === me
+  return (
+    <li className="card-line">
+      <span className="card-note">{c.body}</span>{' '}
+      <span className="card-note-by">— {mine ? myName : nameOf(c.user_id)}, <time dateTime={c.created_at}>{fmtDate(c.created_at)}</time></span>{' '}
+      {(mine || isOwner) && (confirming ? (
+        <>
+          <button type="button" className="card-link danger" onClick={() => remove(c.id)}>Erase</button>{' '}
+          <button type="button" className="card-link quiet" onClick={() => setConfirming(false)}>Keep</button>
+        </>
+      ) : (
+        <button type="button" className="card-link quiet" onClick={() => setConfirming(true)}
+          aria-label={`Erase note from ${mine ? 'you' : nameOf(c.user_id)}`}>Erase</button>
+      ))}
+    </li>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Your side: status, take, spine color, a note, and the owner's tools
+// ---------------------------------------------------------------------------
+
+function MySide({ book, copy, me, isOwner, tone, members, nameOf, actions, margins }) {
+  const myRow = (book.reading || []).find((r) => r.user_id === me)
+  const status = myRow?.status || 'none'
+  const rating = myRow?.rating || null
+  const [toneOpen, setToneOpen] = useState(false)
+  const [note, setNote] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  async function addNote(e) {
+    e.preventDefault()
+    if (!note.trim() || busy) return
+    setBusy(true)
+    const ok = await margins.post(note.trim())
+    setBusy(false)
+    if (ok) setNote('')
+  }
+
+  return (
+    <>
+      <p className="card-line" role="group" aria-label="Your reading status">
+        I{' '}
+        {MY_STATUSES.map(([v, label]) => (
+          <span key={v}>
+            <button type="button" className="tab" aria-pressed={status === v}
+              onClick={() => actions.setMark(book.id, status === v ? 'none' : v)}>{label}</button>{' '}
+          </span>
+        ))}
+      </p>
+      <p className="card-line" role="group" aria-label="Your take">
+        and{' '}
+        {MY_VERDICTS.map(([v, label]) => (
+          <span key={v}>
+            <button type="button" className="tab" aria-pressed={rating === v}
+              onClick={() => actions.rate(book.id, rating === v ? null : v, status)}>{label}</button>{' '}
+          </span>
+        ))}
+      </p>
+
+      {isOwner && (
+        <p className="card-line">
+          <mark className="tab plain">Spine color?</mark>{' '}
+          <button type="button" className={`swatch tone-${tone}`} aria-expanded={toneOpen}
+            aria-label={`Spine color: ${copy.tone ? tone : `${tone} (picked automatically)`}. Change it`}
+            onClick={() => setToneOpen((v) => !v)} />{' '}
+          {toneOpen && (
+            <span role="group" aria-label="Pick a spine color">
+              {SPINE_TONES.map((t) => (
+                <span key={t}>
+                  <button type="button" className={`swatch tone-${t}`} aria-label={t} aria-pressed={copy.tone === t}
+                    onClick={async () => { setToneOpen(false); await actions.setTone(copy, t) }} />{' '}
+                </span>
+              ))}
+              {copy.tone && (
+                <button type="button" className="card-link quiet" onClick={async () => { setToneOpen(false); await actions.setTone(copy, null) }}>automatic</button>
+              )}
+            </span>
+          )}
+        </p>
+      )}
+
+      {!margins.missing && (
+        <form className="card-line" onSubmit={addNote}>
+          <label htmlFor={`note-${copy.id}`} className="tab plain">In the margins:</label>{' '}
+          <input id={`note-${copy.id}`} className="card-input" maxLength={2000} value={note} onChange={(e) => setNote(e.target.value)}
+            placeholder="A thought, a quote, a warning…" />{' '}
+          <button type="submit" className="tab card-add" disabled={busy || !note.trim()}>add</button>
+        </form>
+      )}
+
+      {isOwner && (
+        <div className="card-owner">
+          <p className="card-line card-sub">Your copy</p>
+          <CopyRow copy={copy} me={me} members={members} nameOf={nameOf} actions={actions} compact hideHistory />
+        </div>
+      )}
+    </>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Shared pieces
+// ---------------------------------------------------------------------------
 
 // The cover: the real one from Open Library when we have it, drawn on top of our own
 // colored cover. While the picture loads, or if it can't, you see the colored one.
@@ -132,39 +336,30 @@ export function BookCover({ title, author, tone, coverId = null, small = false }
   )
 }
 
-export function LibraryLog({ copy, nameOf }) {
+export function LibraryLog({ copy, nameOf, id }) {
   const events = libraryLog(copy, nameOf)
   return (
-    <ol className="log-list" aria-label="Library log, oldest first">
+    <ol className="card-log" id={id} aria-label="Library log, oldest first">
       {events.map((e, i) => (
-        <li className={`log-row ${e.kind}`} key={`${e.kind}-${e.at}-${i}`}>
-          <span className="log-icon" aria-hidden="true">
-            <svg viewBox="0 0 24 24"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v16H6.5A2.5 2.5 0 0 0 4 21.5z" /><path d="M4 5.5v16M8 7h8" /></svg>
-          </span>
-          <p>{e.text}</p>
-          <time dateTime={e.at}>{fmtDate(e.at, { year: true })}</time>
+        <li className={`card-line ${e.kind}`} key={`${e.kind}-${e.at}-${i}`}>
+          <time dateTime={e.at}>{fmtDate(e.at, { year: true })}</time> {e.text}
         </li>
       ))}
     </ol>
   )
 }
 
-// Comments on one copy, shown as notes "in the margins" under the cover.
-// Saved in the `comments` table (update-4.sql).
-export function Comments({ copy, me, isOwner, nameOf, myName, showToast }) {
+// Notes "in the margins" for one copy (the `comments` table, update-4.sql), kept live.
+function useMargins(copyId, me, showToast) {
   const [items, setItems] = useState(null)
   const [missing, setMissing] = useState(false)
-  const [body, setBody] = useState('')
-  const [busy, setBusy] = useState(false)
-  const [confirmId, setConfirmId] = useState(null)
-  const [open, setOpen] = useState(() => { try { return localStorage.getItem('glam_margins_open') === '1' } catch { return false } })
-  const toggle = (v) => { setOpen(v); try { localStorage.setItem('glam_margins_open', v ? '1' : '0') } catch { /* private mode */ } }
 
   const load = useCallback(async () => {
+    if (!copyId) return
     const { data, error } = await supabase
       .from('comments')
       .select('id, user_id, body, created_at')
-      .eq('copy_id', copy.id)
+      .eq('copy_id', copyId)
       .order('created_at', { ascending: true })
     if (error) {
       // The table arrives with update-4.sql; until then, say so instead of breaking the page.
@@ -174,92 +369,31 @@ export function Comments({ copy, me, isOwner, nameOf, myName, showToast }) {
       return
     }
     setItems(data || [])
-  }, [copy.id, showToast])
+  }, [copyId, showToast])
 
   useEffect(() => {
-    setItems(null); setConfirmId(null)
+    if (!copyId) return undefined
+    setItems(null)
     load()
     const channel = supabase
-      .channel('comments-' + copy.id)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'comments', filter: `copy_id=eq.${copy.id}` }, () => load())
+      .channel('comments-' + copyId)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'comments', filter: `copy_id=eq.${copyId}` }, () => load())
       .subscribe()
     return () => { supabase.removeChannel(channel) }
-  }, [copy.id, load])
+  }, [copyId, load])
 
-  async function post(e) {
-    e.preventDefault()
-    const text = body.trim()
-    if (!text) return
-    setBusy(true)
-    const { error } = await supabase.from('comments').insert({ copy_id: copy.id, user_id: me, body: text })
-    setBusy(false)
-    if (error) { showToast(friendlyError(error)); return }
-    setBody('')
+  const post = useCallback(async (body) => {
+    const { error } = await supabase.from('comments').insert({ copy_id: copyId, user_id: me, body })
+    if (error) { showToast(friendlyError(error)); return false }
     load()
-  }
+    return true
+  }, [copyId, me, load, showToast])
 
-  async function remove(id) {
+  const remove = useCallback(async (id) => {
     const { error } = await supabase.from('comments').delete().eq('id', id)
-    setConfirmId(null)
     if (error) { showToast(friendlyError(error)); return }
     load()
-  }
+  }, [load, showToast])
 
-  const count = items === null ? '' : items.length === 0 ? 'empty so far' : `${items.length} ${items.length === 1 ? 'note' : 'notes'}`
-  const panelId = `margins-${copy.id}`
-
-  return (
-    <section className="margins" aria-label="The margins: notes from readers">
-      <button type="button" className="margins-toggle" aria-expanded={open} aria-controls={panelId} onClick={() => toggle(!open)}>
-        <span className="margins-label">{open ? 'Close the margins' : 'See the margins'}</span>
-        <span className="margins-count">{count}</span>
-      </button>
-      {open && (
-        <div className="margin-notes" id={panelId}>
-          {missing ? (
-            <p className="hint">The margins need the latest database update (update-4.sql in the supabase folder).</p>
-          ) : items === null ? (
-            <p className="hint">Opening the margins…</p>
-          ) : items.length === 0 ? (
-            <p className="hint">Nobody has written in the margins yet. Be the first.</p>
-          ) : (
-            <ul className="note-list">
-              {items.map((c) => {
-                const mine = c.user_id === me
-                return (
-                  <li className="margin-note" key={c.id}>
-                    <p className="note-body">{c.body}</p>
-                    <div className="note-meta">
-                      <span>— {mine ? myName : nameOf(c.user_id)}</span>
-                      <time dateTime={c.created_at}>{fmtDate(c.created_at)}</time>
-                      {(mine || isOwner) && (
-                        confirmId === c.id ? (
-                          <span className="comment-confirm">
-                            <button type="button" className="linkish small danger-text" onClick={() => remove(c.id)}>Erase</button>
-                            <button type="button" className="linkish small muted" onClick={() => setConfirmId(null)}>Keep</button>
-                          </span>
-                        ) : (
-                          <button type="button" className="linkish small muted" onClick={() => setConfirmId(c.id)}
-                            aria-label={`Erase note from ${mine ? 'you' : nameOf(c.user_id)}`}>Erase</button>
-                        )
-                      )}
-                    </div>
-                  </li>
-                )
-              })}
-            </ul>
-          )}
-          {!missing && (
-            <form className="margin-form" onSubmit={post}>
-              <label htmlFor={`comment-${copy.id}`}>Write in the margin</label>
-              <textarea id={`comment-${copy.id}`} rows={2} value={body} maxLength={2000} onChange={(e) => setBody(e.target.value)}
-                placeholder="A thought, a favorite line, a warning…"
-                onKeyDown={(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) post(e) }} />
-              <button type="submit" className="btn small" disabled={busy || !body.trim()}>Add note</button>
-            </form>
-          )}
-        </div>
-      )}
-    </section>
-  )
+  return { items, missing, post, remove }
 }

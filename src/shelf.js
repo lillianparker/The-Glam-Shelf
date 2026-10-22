@@ -58,11 +58,13 @@ export function spineTone(copyId, attempt = 0) {
 
 // Colours for one shelf, in shelf order, so no two neighbours ever match.
 // Each copy gets its preferred colour unless the book before it already has
-// that colour; then it takes its next choice.
+// that colour; then it takes its next choice. A colour the owner picked always stays.
 export function shelfTones(items) {
   const out = {}
   let prev = null
   for (const { copy } of items) {
+    // the owner chose a color (update-10.sql): that wins
+    if (copy.tone && SPINE_TONES.includes(copy.tone)) { out[copy.id] = copy.tone; prev = copy.tone; continue }
     let tone = spineTone(copy.id)
     for (let attempt = 1; tone === prev && attempt < 12; attempt++) tone = spineTone(copy.id, attempt)
     if (tone === prev) tone = SPINE_TONES.find((t) => t !== prev)

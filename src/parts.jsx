@@ -3,15 +3,16 @@ import { useRef, useState } from 'react'
 
 export const VERDICTS = [
   ['up', 'Loved it'],
-  ['good', 'It was good'],
+  ['good', 'Liked it'],
   ['meh', 'It was fine'],
-  ['down', 'Not for me'],
+  ['down', 'It wasn’t for me'],
 ]
 
 export const STATUSES = [
   ['want', 'Want to read'],
   ['reading', 'Reading'],
   ['read', 'Read'],
+  ['dnf', 'DNF’d'],
   ['none', 'None'],
 ]
 

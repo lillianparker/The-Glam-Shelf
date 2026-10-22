@@ -51,8 +51,8 @@
   --f-display: "Bodoni Moda", "Didot", "Bodoni 72", Georgia, serif;
   --f-body: "Figtree", system-ui, -apple-system, "Segoe UI", sans-serif;
   --f-mono: "DM Mono", ui-monospace, Menlo, monospace;
+  --f-spine: "Grenze", "Bodoni Moda", Georgia, serif;   /* book titles on the spines */
   --f-hand: "Nothing You Could Do", "Segoe Print", "Bradley Hand", cursive;   /* notes in the margins */
-   --f-spine: "Grenze", "Bodoni Moda", Georgia, serif;
   --margin-paper: #f4e8d6;  /* the page edge the notes are written on */
   --pencil: #3a2a26;        /* margin-note handwriting */
   color-scheme: dark;
@@ -515,7 +515,7 @@ svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width:
   pointer-events: none;
 }
 .spine-title > span { /* up to two lines, then "…" */
-  font: 500 19px/1.05 var(--f-spine); 
+  font: 500 19px/1.05 var(--f-spine);
   display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden;
 }
 .spine-author {
@@ -848,6 +848,136 @@ svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width:
 }
 .copy-switch button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
 .modal-panel .listing { box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5); }
+
+/* ---------- the book listing as an index card ----------
+   Everything inside sits on one rhythm: --rule is the space between the card's lines,
+   and every line of text is exactly that tall, so long text wraps onto the next rule
+   instead of stretching the spacing. */
+.index-card {
+  --rule: 38px;
+  --card-paper: #f6f0e4;
+  --card-ink: #2c2422;
+  --card-muted: #6b5c55;              /* 5.8:1 on the paper */
+  --card-rule: rgba(84, 104, 182, 0.28);
+  --card-red: #d98a90;
+  --tab: #ebdfca;
+  --card-link: #a3194f;
+  position: relative; background: var(--card-paper); color: var(--card-ink); border-radius: 4px;
+  box-shadow: 0 24px 50px -14px rgba(0, 0, 0, 0.55), 0 3px 8px rgba(0, 0, 0, 0.3);
+}
+.modal-panel .index-card { box-shadow: 0 30px 70px -10px rgba(0, 0, 0, 0.65), 0 4px 10px rgba(0, 0, 0, 0.35); }
+.card-head {
+  display: flex; flex-wrap: wrap; align-items: flex-end; gap: 4px 14px; min-height: 62px; box-sizing: border-box;
+  padding: 14px 26px 8px calc(26px + 184px + 28px);   /* lines up with the writing, right of the cover */
+  border-bottom: 1.5px solid var(--card-red);
+}
+.card-title { margin: 0; flex: 1 1 auto; min-width: 0; font: 500 26px/1.12 var(--f-display); overflow-wrap: anywhere; color: var(--card-ink); }
+.card-title:focus { outline: none; }
+.card-title:focus-visible { outline: 2px solid var(--card-link); outline-offset: 4px; }
+.index-card .star { color: #8a6a1c; background: #f2e2b4; border-color: transparent; }
+.card-mode { margin-left: auto; display: inline-flex; align-items: baseline; gap: 10px; }
+.card-editing { font: italic 500 15px var(--f-display); color: var(--card-muted); }
+.card-toggle {
+  background: none; border: 0; padding: 6px 2px; cursor: pointer;
+  font: 600 14px var(--f-body); color: var(--card-ink); text-decoration: underline; text-underline-offset: 3px;
+}
+.index-card.editing .card-toggle { color: var(--card-link); }
+
+.card-body {
+  display: grid; grid-template-columns: 184px minmax(0, 1fr); gap: 0 28px;
+  padding: 0 26px var(--rule) 26px; min-height: calc(var(--rule) * 8);
+  /* the blue rules, 9px under each line's middle so writing sits on them */
+  background-image: repeating-linear-gradient(to bottom,
+    transparent 0, transparent calc(var(--rule) - 9px),
+    var(--card-rule) calc(var(--rule) - 9px), var(--card-rule) calc(var(--rule) - 8px),
+    transparent calc(var(--rule) - 8px), transparent var(--rule));
+}
+.card-cover { position: relative; align-self: start; margin-top: -30px; }
+.card-cover .cover { width: 100%; max-width: none; }
+.tape {   /* a strip of tape holding the cover to the card */
+  position: absolute; left: -8px; top: -10px; bottom: -10px; width: 20px; pointer-events: none;
+  background: rgba(241, 214, 122, 0.7); transform: rotate(-1deg); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+}
+
+.card-lines { min-width: 0; font: 400 15px/var(--rule) var(--f-body); color: var(--card-ink); }
+.card-lines * { line-height: inherit; }
+.card-line { margin: 0; min-height: var(--rule); overflow-wrap: anywhere; }
+.card-by { font: italic 500 16px/var(--rule) var(--f-display); color: var(--card-muted); }
+.card-quiet { color: var(--card-muted); font-style: italic; }
+.card-sub { font: 600 11px/var(--rule) var(--f-body); letter-spacing: 0.09em; text-transform: uppercase; color: var(--card-muted); }
+.card-note { font: 500 17px/var(--rule) var(--f-hand); color: #2f3e7a; }
+.card-note-by { font-style: italic; color: var(--card-muted); font-size: 13.5px; }
+.card-notes, .card-log { list-style: none; margin: 0; padding: 0; }
+.card-log time { font: 500 11.5px var(--f-mono); color: var(--card-muted); margin-right: 6px; }
+
+/* the little paper tabs: words to read on the front, choices to tap on your side */
+.tab {
+  display: inline-block; height: 28px; line-height: 28px !important; padding: 0 9px; border-radius: 3px; vertical-align: baseline;
+  background: var(--tab); color: var(--card-ink); font: inherit; font-weight: 600; white-space: nowrap;
+  text-decoration: underline; text-underline-offset: 3px; text-decoration-thickness: 1px;
+}
+.tab.plain { font-weight: 400; text-decoration: none; }
+button.tab { border: 0; cursor: pointer; font-weight: 400; text-decoration: none; }
+button.tab:hover { box-shadow: inset 0 0 0 1px rgba(44, 36, 34, 0.35); }
+button.tab[aria-pressed="true"] { font-weight: 600; text-decoration: underline; background: #e2d2b6; }
+button.tab:focus-visible, .card-link:focus-visible, .swatch:focus-visible, .card-input:focus-visible {
+  outline: 2px solid var(--card-link); outline-offset: 2px;
+}
+.card-add { background: var(--card-link); color: #fff; font-weight: 600; }
+.card-add:disabled { opacity: 0.45; cursor: not-allowed; }
+.card-link {
+  background: none; border: 0; padding: 0 2px; cursor: pointer; white-space: nowrap;
+  font: 600 14px var(--f-body); color: var(--card-link); text-decoration: underline; text-underline-offset: 3px;
+}
+.card-link.quiet { color: var(--card-muted); font-weight: 500; }
+.card-link.danger { color: #9b1c1c; }
+.card-input {
+  display: inline-block; width: min(100%, 300px); height: 30px; vertical-align: baseline; padding: 0 2px;
+  background: transparent; border: 0; border-radius: 0; color: #2f3e7a; font: 500 17px var(--f-hand);
+}
+.card-input::placeholder { color: #8a7b72; }
+.swatch {
+  display: inline-block; width: 26px; height: 26px; padding: 0; vertical-align: middle; cursor: pointer;
+  border-radius: 4px; border: 1px solid rgba(44, 36, 34, 0.4);
+}
+.swatch[aria-pressed="true"] { box-shadow: 0 0 0 2px var(--card-paper), 0 0 0 4px var(--card-ink); }
+.swatch[aria-expanded] { border: 1.5px solid var(--card-ink); }
+
+/* the owner's tools, kept on the card's rules */
+.card-owner .copy, .card-owner .copy-main, .card-owner .ctrl, .card-owner .owner-tools,
+.card-owner .line, .card-owner .give-form, .card-owner .edit-form, .card-owner .edit-actions, .card-owner .inline {
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 10px; margin: 0; padding: 0; border: 0; max-width: none;
+}
+.card-owner .copy { flex-direction: column; align-items: stretch; }
+.card-owner .ctrl { margin-left: 0; }
+.card-owner .field { flex-direction: row; align-items: baseline; gap: 8px; }
+.card-owner .field span, .card-owner .line-label { font: 600 11px var(--f-body); letter-spacing: 0.08em; text-transform: uppercase; color: var(--card-muted); }
+.card-owner select, .card-owner input:not([type="checkbox"]) {
+  width: auto; max-width: 220px; height: 30px; padding: 0 8px; vertical-align: baseline;
+  background: #fffaf1; border: 1px solid rgba(44, 36, 34, 0.3); border-radius: 4px; color: var(--card-ink); font-size: 14px;
+}
+.card-owner .btn.small { height: 28px; padding: 0 12px; font-size: 13px; line-height: 26px; }
+.card-owner .btn { background: var(--card-link); border-color: var(--card-link); color: #fff; }
+.card-owner .btn.ghost, .card-owner .btn.danger { background: transparent; color: var(--card-link); }
+.card-owner .btn.danger { color: #9b1c1c; border-color: #9b1c1c; }
+.card-owner .linkish { color: var(--card-link); }
+.card-owner .linkish.muted { color: var(--card-muted); }
+.card-owner .chip.off { color: var(--card-muted); border-color: var(--card-muted); }
+.card-owner .line li:not(.line-label) { background: #fffaf1; color: var(--card-ink); border-color: rgba(44, 36, 34, 0.25); }
+.card-owner .give-note, .card-owner span.small { color: var(--card-muted); }
+.card-owner .check { color: var(--card-ink); }
+
+@media (max-width: 620px) {
+  .index-card { --rule: 36px; }
+  .card-head { padding: 14px 18px 8px; }
+  .card-title { font-size: 22px; }
+  .card-body { grid-template-columns: 1fr; padding: 0 18px var(--rule); }
+  /* the cover takes exactly six rules, so the writing under it still lands on the lines */
+  .card-cover { margin-top: 0; height: calc(var(--rule) * 6); padding-top: 14px; box-sizing: border-box; }
+  .card-cover .cover { width: 132px; padding: 14px 11px; }
+  .card-cover .cover strong { font-size: 18px; }
+  .card-cover .tape { top: 4px; bottom: auto; height: calc(132px / 0.68 + 20px); }
+}
 
 .give-form { flex-basis: 100%; display: flex; flex-direction: column; gap: 8px; max-width: 420px; }
 .give-form select { width: auto; max-width: 100%; }

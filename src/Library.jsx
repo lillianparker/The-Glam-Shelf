@@ -30,17 +30,26 @@ const HOMEPAGE_TEXT = 'Search for books, upload ones you own, and borrow from fr
 
 // Members with their names and avatars. If the avatar column doesn't exist yet
 // (update-5.sql not run), load without it so nothing else breaks.
-// Books with their copies, line, loans and reading. If the cover columns don't exist yet
-// (update-9.sql not run), load without them so nothing else breaks.
-const COPY_FIELDS =
-  'copies(id, owner_id, status, lendable, lent_to_user, lent_to_name, lent_at, created_at, item_id, everywhere, queue(user_id, sort_key, joined_at), loans(id, borrower_id, borrower_name, lent_at, returned_at)), ' +
-  'reading(user_id, status, rating)'
+// Books with their copies, line, loans and reading. Newer columns (covers: update-9.sql,
+// spine color: update-10.sql) are left out if the database doesn't have them yet, so nothing else breaks.
+function booksQuery({ covers, tone }) {
+  return (
+    'id, title, author, ' + (covers ? 'cover_id, cover_looked, ' : '') +
+    'copies(id, owner_id, status, lendable, lent_to_user, lent_to_name, lent_at, created_at, item_id, everywhere, ' + (tone ? 'tone, ' : '') +
+    'queue(user_id, sort_key, joined_at), loans(id, borrower_id, borrower_name, lent_at, returned_at)), ' +
+    'reading(user_id, status, rating)'
+  )
+}
 async function loadBooks(groupId) {
-  const res = await supabase.from('books').select('id, title, author, cover_id, cover_looked, ' + COPY_FIELDS).eq('group_id', groupId)
-  if (res.error && /cover/i.test(res.error.message || '')) {
-    return supabase.from('books').select('id, title, author, ' + COPY_FIELDS).eq('group_id', groupId)
+  const has = { covers: true, tone: true }
+  for (let tries = 0; tries < 3; tries++) {
+    const res = await supabase.from('books').select(booksQuery(has)).eq('group_id', groupId)
+    const msg = res.error?.message || ''
+    if (res.error && has.tone && /tone/i.test(msg)) { has.tone = false; continue }
+    if (res.error && has.covers && /cover/i.test(msg)) { has.covers = false; continue }
+    return res
   }
-  return res
+  return supabase.from('books').select(booksQuery({ covers: false, tone: false })).eq('group_id', groupId)
 }
 
 async function loadMembers(groupId) {
@@ -174,6 +183,8 @@ export default function Library({ group, groups, profile, notice, clearNotice, o
 
   const actions = {
     findCover: findBookCover,
+    // the owner picks their copy's spine color (null = automatic again); needs update-10.sql
+    setTone: (copy, tone) => run(supabase.rpc('set_spine_tone', { cid: copy.id, new_tone: tone }), tone ? 'Spine color saved' : 'Spine color back to automatic'),
     addCopy: async (title, author, everywhere = false) => {
       let res = await supabase.rpc('add_copy', { gid: group.id, book_title: title, book_author: author, everywhere })
       if (res.error && /add_copy|function/i.test(res.error.message || '')) {

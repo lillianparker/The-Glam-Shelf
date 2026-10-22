@@ -50,7 +50,7 @@ export default function BookModal({ entry, intro = null, copies, onPickCopy, onC
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18" /></svg>
           </button>
         </div>
-        <BookListing key={entry.copy.id} ref={headingRef} idBase="modal-listing" entry={entry} tone={tones[entry.copy.id]} me={me} myName={myName} nameOf={nameOf} {...listingProps} />
+        <BookListing key={entry.copy.id} ref={headingRef} idBase="modal-listing" entry={entry} tone={tones[entry.copy.id]} me={me} myName={myName} nameOf={nameOf} startEditing={Boolean(intro)} {...listingProps} />
       </div>
     </div>
   )
