@@ -226,7 +226,8 @@ export default function Library({ group, groups, profile, notice, clearNotice, o
       run(supabase.rpc('edit_copy', { cid: copy.id, new_title: title, new_author: author }), 'Book details saved'),
     setLendable: (copy, lendable) =>
       run(supabase.from('copies').update({ lendable }).eq('id', copy.id), lendable ? 'Open for borrowing again' : 'Marked as not lending'),
-    joinLine: (copy) => run(supabase.rpc('join_line', { cid: copy.id }), "You're in line"),
+    // Getting in line = wanting to read it (update-11.sql keeps the two together)
+    joinLine: (copy) => run(supabase.rpc('join_line', { cid: copy.id }), "You're in line, and it's on your want-to-read"),
     leaveLine: (copy) => run(supabase.from('queue').delete().eq('copy_id', copy.id).eq('user_id', me), 'You left the line'),
     removeFromLine: (copy, uid) =>
       run(supabase.from('queue').delete().eq('copy_id', copy.id).eq('user_id', uid), `Took ${nameOf(uid)} off the line`),
@@ -239,7 +240,10 @@ export default function Library({ group, groups, profile, notice, clearNotice, o
       if (status === 'none') return run(supabase.from('reading').delete().eq('user_id', me).eq('book_id', bookId))
       const row = { user_id: me, book_id: bookId, status, updated_at: new Date().toISOString() }
       if (status !== 'read') row.rating = null
-      return run(supabase.from('reading').upsert(row))
+      // Want to read a friend's book = get in line for it (update-11.sql does the line)
+      const book = (books || []).find((b) => b.id === bookId)
+      const borrowable = book && !book.copies.some((c) => c.owner_id === me || c.lent_to_user === me) && book.copies.some((c) => c.lendable && c.owner_id !== me)
+      return run(supabase.from('reading').upsert(row), status === 'want' && borrowable ? "On your want-to-read, and you're in line" : null)
     },
     setRating: (bookId, rating) =>
       run(supabase.from('reading').update({ rating, updated_at: new Date().toISOString() }).eq('user_id', me).eq('book_id', bookId)),
