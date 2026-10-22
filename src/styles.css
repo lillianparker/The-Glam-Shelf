@@ -986,3 +986,21 @@ kbd {
 }
 .activity-book:hover, .activity-book:focus-visible { text-decoration-color: var(--accent); }
 .activity-book:hover i { color: var(--accent); }
+
+/* ---------- wanted from your shelf ---------- */
+.wanted { background: var(--accent-soft); border-radius: 14px; padding: 4px 18px; }
+.wanted-toggle {
+  width: 100%; display: flex; align-items: center; gap: 10px; background: none; border: 0; padding: 10px 0;
+  color: var(--ink); font: italic 500 20px var(--f-display); cursor: pointer; text-align: left;
+}
+.wanted-toggle .count {
+  font: 600 12px var(--f-body); font-style: normal; background: var(--accent); color: var(--accent-ink);
+  border-radius: 999px; padding: 2px 8px; min-width: 22px; text-align: center;
+}
+.wanted-toggle svg { margin-left: auto; width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; transition: transform .2s; }
+.wanted-toggle[aria-expanded="true"] svg { transform: rotate(180deg); }
+.wanted ul { list-style: none; margin: 0 0 8px; padding: 0; }
+.wanted li { padding: 8px 0; border-top: 1px solid color-mix(in srgb, var(--accent) 25%, transparent); line-height: 1.5; }
+.wanted-people { display: block; font-size: 14px; }
+.wanted-people b { font-weight: 600; }
+.wanted-empty { margin: 0 0 12px; }

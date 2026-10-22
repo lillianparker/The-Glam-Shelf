@@ -89,6 +89,30 @@ export default function Activity({ books, me, nameOf, onOpen }) {
         })
       }
     }
+    // wants to read: a place in line names the copy; otherwise just the book
+    for (const b of books) {
+      const lined = new Set()
+      for (const c of b.copies) {
+        for (const q of c.queue || []) {
+          lined.add(q.user_id)
+          out.push({
+            key: `line-${c.id}-${q.user_id}`, at: q.joined_at, who: q.user_id,
+            text: <>wants to read {whose(c.owner_id, q.user_id)} {title(b, c.id)}.</>,
+          })
+        }
+      }
+      for (const r of b.reading) {
+        if (r.status !== 'want' || lined.has(r.user_id)) continue
+        const own = b.copies.find((c) => c.owner_id === r.user_id)
+        const other = b.copies.find((c) => c.owner_id !== r.user_id)
+        out.push({
+          key: `want-${b.id}-${r.user_id}`, at: r.updated_at, who: r.user_id,
+          text: !own && other && b.copies.length === 1
+            ? <>wants to read {whose(other.owner_id, r.user_id)} {title(b, other.id)}.</>
+            : <>wants to read {title(b, (own || b.copies[0])?.id)}.</>,
+        })
+      }
+    }
     // wrote in the margins
     for (const cm of comments) {
       const e = copyById[cm.copy_id]
@@ -105,10 +129,11 @@ export default function Activity({ books, me, nameOf, onOpen }) {
   return (
     <main className="list-view stack-lg">
       <h1 className="view-title">Activity</h1>
+      <WantedFromShelf books={books} me={me} nameOf={nameOf} onOpen={onOpen} />
       {books === null ? (
         <div className="empty"><strong>Opening the shelves…</strong></div>
       ) : items.length === 0 ? (
-        <div className="empty"><strong>Nothing yet</strong>When someone adds, reads or comments on a book, it shows up here.</div>
+        <div className="empty"><strong>Nothing yet</strong>When someone adds, reads, wants or comments on a book, it shows up here.</div>
       ) : (
         <ol className="activity">
           {items.map((it) => (
@@ -123,5 +148,67 @@ export default function Activity({ books, me, nameOf, onOpen }) {
         </ol>
       )}
     </main>
+  )
+}
+
+// The people who want to read the books you own: whoever is in line for your copy,
+// plus anyone who marked it want-to-read and isn't waiting on someone else's copy.
+export function WantedFromShelf({ books, me, nameOf, onOpen }) {
+  const [open, setOpen] = useState(() => { try { return localStorage.getItem('glam_wanted_open') === '1' } catch { return false } })
+  const toggle = () => { const v = !open; setOpen(v); try { localStorage.setItem('glam_wanted_open', v ? '1' : '0') } catch { /* private mode */ } }
+
+  const rows = []
+  for (const b of books || []) {
+    const mine = b.copies.filter((c) => c.owner_id === me)
+    if (!mine.length) continue
+    const people = []
+    const seen = new Set([me])
+    for (const c of mine) {
+      c.queue.forEach((q, i) => {
+        if (seen.has(q.user_id)) return
+        seen.add(q.user_id)
+        people.push({ id: q.user_id, note: i === 0 ? 'next in line' : `${i + 1}${['st', 'nd', 'rd'][i] || 'th'} in line` })
+      })
+    }
+    const elsewhere = new Set(b.copies.filter((c) => c.owner_id !== me).flatMap((c) => c.queue.map((q) => q.user_id)))
+    for (const r of b.reading) {
+      if (r.status !== 'want' || seen.has(r.user_id) || elsewhere.has(r.user_id)) continue
+      if (b.copies.some((c) => c.owner_id === r.user_id)) continue   // they have their own
+      seen.add(r.user_id)
+      people.push({ id: r.user_id, note: 'wants to read' })
+    }
+    if (people.length) rows.push({ book: b, copyId: mine[0].id, people })
+  }
+  const total = rows.reduce((n, r) => n + r.people.length, 0)
+  if (!books) return null
+
+  return (
+    <section className="wanted" aria-label="Wanted from your shelf">
+      <button type="button" className="wanted-toggle" aria-expanded={open} onClick={toggle}>
+        <span>Wanted from your shelf</span>
+        <span className="count">{total}</span>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
+      </button>
+      {open && (
+        rows.length === 0 ? (
+          <p className="muted small wanted-empty">Nobody is waiting on your books right now.</p>
+        ) : (
+          <ul>
+            {rows.map(({ book, copyId, people }) => (
+              <li key={book.id}>
+                <button type="button" className="activity-book" onClick={(e) => onOpen(copyId, e.currentTarget)}>
+                  <i>{book.title}</i>{book.author && <> by {book.author}</>}
+                </button>
+                <span className="wanted-people">
+                  {people.map((p, i) => (
+                    <span key={p.id}>{i > 0 && ', '}<b>{nameOf(p.id)}</b> <span className="muted">({p.note})</span></span>
+                  ))}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )
+      )}
+    </section>
   )
 }

@@ -5,7 +5,7 @@ import Bookcase from './Bookcase.jsx'
 import BookListing from './BookListing.jsx'
 import BookModal from './BookModal.jsx'
 import Play from './Play.jsx'
-import Activity from './Activity.jsx'
+import Activity, { WantedFromShelf } from './Activity.jsx'
 import LibraryCard from './LibraryCard.jsx'
 import AvatarPicker, { AvatarBadge } from './AvatarPicker.jsx'
 import { bookcaseTones, compareTitles, scoreMembers, shelfCopies } from './shelf.js'
@@ -379,6 +379,7 @@ export default function Library({ group, groups, profile, notice, clearNotice, o
       {view === 'home' ? (
         <main className="home stack-lg">
           <h1 className="sr-only">{group.name} bookcase</h1>
+          <WantedFromShelf books={books} me={me} nameOf={nameOf} onOpen={openActivityCopy} />
           <section className="intro">
             <div>              
               <p>{HOMEPAGE_TEXT}</p>
