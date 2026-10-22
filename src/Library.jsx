@@ -411,6 +411,7 @@ export default function Library({ group, groups, profile, notice, clearNotice, o
 
       <GroupBar group={group} groups={groups} members={members} scores={scores} me={me} profile={profile}
         person={view === 'home' ? expandedOwner : person} onOpenShelf={openShelf}
+        showMembers={view !== 'activity' && view !== 'play'}
         onSwitchGroup={onSwitchGroup} onGroupsChange={onGroupsChange} showToast={showToast} />
 
       {view === 'home' ? (
@@ -606,7 +607,9 @@ function ForYou({ books, me, nameOf, actions }) {
   )
 }
 
-function GroupBar({ group, groups, members, scores, me, profile, person, onOpenShelf, onSwitchGroup, onGroupsChange, showToast }) {
+// showMembers: the name chips open someone's shelf, so they only show on the tabs with shelves
+// (Bookcase, My shelf, All books), not on Activity or Play.
+function GroupBar({ group, groups, members, scores, me, profile, person, onOpenShelf, showMembers = true, onSwitchGroup, onGroupsChange, showToast }) {
   const inviteUrl = `${window.location.origin}${window.location.pathname}?join=${group.invite_code}`
   const [showLink, setShowLink] = useState(false)
   const [creating, setCreating] = useState(false)
@@ -645,7 +648,7 @@ function GroupBar({ group, groups, members, scores, me, profile, person, onOpenS
         <button type="button" className="btn small" onClick={copy}>Copy invite link</button>
         <button type="button" className="btn small ghost" onClick={() => setCreating((v) => !v)}>New library group</button>
       </div>
-      <ul className="members" aria-label="Members">
+      {showMembers && <ul className="members" aria-label="Members">
         {[...members]
           .sort((a, b) => (scores[b.id]?.total || 0) - (scores[a.id]?.total || 0) || a.name.localeCompare(b.name))
           .map((m) => (
@@ -658,7 +661,7 @@ function GroupBar({ group, groups, members, scores, me, profile, person, onOpenS
             </button>
           </li>
         ))}
-      </ul>
+      </ul>}
       {showLink && (
         <div className="linkbox">
           <span className="muted small">Copy this link and send it to a friend:</span>
