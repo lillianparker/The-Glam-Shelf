@@ -980,3 +980,9 @@ kbd {
 @media (max-width: 580px) {
   .activity li { flex-direction: column; gap: 2px; }
 }
+.activity-book {
+  background: none; border: 0; padding: 0; margin: 0; font: inherit; color: inherit; text-align: left; cursor: pointer;
+  text-decoration: underline; text-decoration-color: color-mix(in srgb, var(--accent) 45%, transparent); text-underline-offset: 3px;
+}
+.activity-book:hover, .activity-book:focus-visible { text-decoration-color: var(--accent); }
+.activity-book:hover i { color: var(--accent); }

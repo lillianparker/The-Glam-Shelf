@@ -20,7 +20,7 @@ function when(iso) {
   return t.toLocaleDateString(undefined, { month: 'short', day: 'numeric', ...(sameYear ? {} : { year: 'numeric' }) })
 }
 
-export default function Activity({ books, me, nameOf }) {
+export default function Activity({ books, me, nameOf, onOpen }) {
   const [comments, setComments] = useState([])
 
   // Comments live in their own table; load the newest and keep them live.
@@ -52,14 +52,19 @@ export default function Activity({ books, me, nameOf }) {
     // "Ted's copy of", "your copy of", or "their own copy of"
     const whose = (ownerId, actorId) =>
       ownerId === me ? 'your copy of' : ownerId === actorId ? 'their own copy of' : `${nameOf(ownerId)}’s copy of`
-    const title = (b) => <><i>{b.title}</i>{b.author && <> by {b.author}</>}</>
+    // the title opens that copy's listing
+    const title = (b, copyId) => (
+      <button type="button" className="activity-book" onClick={(e) => onOpen(copyId, e.currentTarget)}>
+        <i>{b.title}</i>{b.author && <> by {b.author}</>}
+      </button>
+    )
 
     for (const b of books) {
       // added to a shelf
       for (const c of b.copies) {
         out.push({
           key: 'add-' + c.id, at: c.created_at, who: c.owner_id,
-          text: <>added {title(b)} to {c.owner_id === me ? 'your' : 'their'} shelf.</>,
+          text: <>added {title(b, c.id)} to {c.owner_id === me ? 'your' : 'their'} shelf.</>,
         })
       }
       // finished reading
@@ -68,18 +73,19 @@ export default function Activity({ books, me, nameOf }) {
         const ownsOne = b.copies.some((c) => c.owner_id === r.user_id)
         // If they don't own it, credit the copy they last borrowed.
         let borrowed = null
+        const own = b.copies.find((c) => c.owner_id === r.user_id)
         if (!ownsOne) {
           for (const c of b.copies) {
             if (c.owner_id === r.user_id) continue
             for (const l of c.loans || []) {
-              if (l.borrower_id === r.user_id && (!borrowed || l.lent_at > borrowed.lent_at)) borrowed = { lent_at: l.lent_at, owner: c.owner_id }
+              if (l.borrower_id === r.user_id && (!borrowed || l.lent_at > borrowed.lent_at)) borrowed = { lent_at: l.lent_at, owner: c.owner_id, copyId: c.id }
             }
-            if (!borrowed && c.lent_to_user === r.user_id) borrowed = { lent_at: c.lent_at || '', owner: c.owner_id }
+            if (!borrowed && c.lent_to_user === r.user_id) borrowed = { lent_at: c.lent_at || '', owner: c.owner_id, copyId: c.id }
           }
         }
         out.push({
           key: `read-${b.id}-${r.user_id}`, at: r.updated_at, who: r.user_id,
-          text: borrowed ? <>read {whose(borrowed.owner, r.user_id)} {title(b)}.</> : <>read {title(b)}.</>,
+          text: borrowed ? <>read {whose(borrowed.owner, r.user_id)} {title(b, borrowed.copyId)}.</> : <>read {title(b, (own || b.copies[0])?.id)}.</>,
         })
       }
     }
@@ -89,12 +95,12 @@ export default function Activity({ books, me, nameOf }) {
       if (!e) continue   // a comment in one of your other libraries
       out.push({
         key: 'note-' + cm.id, at: cm.created_at, who: cm.user_id,
-        text: <>commented on {whose(e.copy.owner_id, cm.user_id)} {title(e.book)}.</>,
+        text: <>commented on {whose(e.copy.owner_id, cm.user_id)} {title(e.book, cm.copy_id)}.</>,
         quote: cm.body,
       })
     }
     return out.filter((x) => x.at).sort((a, b) => b.at.localeCompare(a.at)).slice(0, MAX_ITEMS)
-  }, [books, comments, me, nameOf])
+  }, [books, comments, me, nameOf, onOpen])
 
   return (
     <main className="list-view stack-lg">

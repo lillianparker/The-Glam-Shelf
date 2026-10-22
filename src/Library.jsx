@@ -298,6 +298,7 @@ export default function Library({ group, groups, profile, notice, clearNotice, o
     if (el && el.isConnected) requestAnimationFrame(() => el.focus())
   }, [])
   const modalEntry = findEntry(modalCopyId)
+  const openActivityCopy = useCallback((copyId, el) => { if (copyId) openModal(copyId, null, el) }, [])
 
   function openCopy(id) {
     setSelectedCopyId(id)
@@ -431,7 +432,7 @@ export default function Library({ group, groups, profile, notice, clearNotice, o
           </div>
         </main>
       ) : view === 'activity' ? (
-        <Activity books={books} me={me} nameOf={nameOf} />
+        <Activity books={books} me={me} nameOf={nameOf} onOpen={openActivityCopy} />
       ) : view === 'play' ? (
         <Play libraryName={group.name} groupId={group.id} me={me} books={books} board={gameScores === null ? null : board} onScore={recordScore} />
       ) : (
