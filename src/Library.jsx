@@ -5,6 +5,7 @@ import Bookcase from './Bookcase.jsx'
 import { BookCover } from './BookListing.jsx'
 import BookModal from './BookModal.jsx'
 import Play from './Play.jsx'
+import Activity, { WantedFromShelf } from './Activity.jsx'
 import LibraryCard from './LibraryCard.jsx'
 import AvatarPicker, { AvatarBadge } from './AvatarPicker.jsx'
 import { bookcaseTones, compareTitles, scoreMembers, spineTone } from './shelf.js'
@@ -37,7 +38,7 @@ function booksQuery({ covers, tone }) {
     'id, title, author, ' + (covers ? 'cover_id, cover_looked, ' : '') +
     'copies(id, owner_id, status, lendable, lent_to_user, lent_to_name, lent_at, created_at, item_id, everywhere, ' + (tone ? 'tone, ' : '') +
     'queue(user_id, sort_key, joined_at), loans(id, borrower_id, borrower_name, lent_at, returned_at)), ' +
-    'reading(user_id, status, rating)'
+    'reading(user_id, status, rating, updated_at)'
   )
 }
 async function loadBooks(groupId) {
@@ -334,6 +335,7 @@ export default function Library({ group, groups, profile, notice, clearNotice, o
     if (el && el.isConnected) requestAnimationFrame(() => el.focus())
   }, [])
   const modalEntry = findEntry(modalCopyId)
+  const openActivityCopy = useCallback((copyId, el) => { if (copyId) openModal(copyId, null, el) }, [])   // eslint-disable-line react-hooks/exhaustive-deps
 
   // A spine on the bookcase opens its book in the same pop-up as All books
   // (closing it puts you back on that spine).
@@ -363,6 +365,7 @@ export default function Library({ group, groups, profile, notice, clearNotice, o
     ['bookcase', 'Bookcase', view === 'home' && !expandedOwner, () => go('home')],
     ['mine', 'My shelf', view === 'home' && expandedOwner === me, () => go('home', { expand: me })],
     ['all', 'All books', view === 'all', () => go('all')],
+    ['activity', 'Activity', view === 'activity', () => go('activity')],
     ['play', 'Play', view === 'play', () => go('play')],
   ]
 
@@ -409,6 +412,7 @@ export default function Library({ group, groups, profile, notice, clearNotice, o
       {view === 'home' ? (
         <main className="home stack-lg">
           <h1 className="sr-only">{group.name} bookcase</h1>
+          <WantedFromShelf books={books} me={me} nameOf={nameOf} onOpen={openActivityCopy} />
           <section className="intro">
             <div>              
               <p>{HOMEPAGE_TEXT}</p>
@@ -447,6 +451,8 @@ export default function Library({ group, groups, profile, notice, clearNotice, o
             <LibraryCard name={profile.display_name} avatar={profile.avatar} libraryName={group.name} joinedAt={myMember?.joinedAt} score={scores[me]} cardNo={cardNumber(board, me)} />
           </div>
         </main>
+      ) : view === 'activity' ? (
+        <Activity books={books} me={me} nameOf={nameOf} onOpen={openActivityCopy} />
       ) : view === 'play' ? (
         <Play libraryName={group.name} groupId={group.id} me={me} books={books} board={gameScores === null ? null : board} onScore={recordScore} />
       ) : (

@@ -109,7 +109,7 @@ function FrontSide({ book, copy, me, myName, isOwner, nameOf, actions, margins, 
             <>
               {!open && <><span className="card-note">{latest.body}</span> <span className="card-note-by">— {by(latest.user_id)}</span>{' '}</>}
               <button type="button" className="card-link" aria-expanded={open} onClick={toggleMargins}>
-                {open ? 'hide the margins' : margins.items.length > 1 ? `see all ${margins.items.length}` : 'see it'}
+                {open ? 'hide margin notes' : margins.items.length > 1 ? `see all ${margins.items.length}` : 'see it'}
               </button>
             </>
           ) : <span className="card-quiet">nothing yet</span>}
