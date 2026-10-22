@@ -2,12 +2,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { supabase, friendlyError } from './supabase.js'
 import Wordmark from './Wordmark.jsx'
 import Bookcase from './Bookcase.jsx'
-import BookListing from './BookListing.jsx'
+import BookListing, { BookCover } from './BookListing.jsx'
 import BookModal from './BookModal.jsx'
 import Play from './Play.jsx'
 import LibraryCard from './LibraryCard.jsx'
 import AvatarPicker, { AvatarBadge } from './AvatarPicker.jsx'
-import { bookcaseTones, compareTitles, scoreMembers, shelfCopies } from './shelf.js'
+import { bookcaseTones, compareTitles, scoreMembers, shelfCopies, spineTone } from './shelf.js'
 import { cardNumber, rankBoard, withRound } from './leaderboard.js'
 import { findCover } from './covers.js'
 import { AddBook, Empty, ScoreLine, joinNames } from './parts.jsx'
@@ -160,6 +160,17 @@ export default function Library({ group, groups, profile, notice, clearNotice, o
     if (error) return
     setBooks((bs) => bs && bs.map((b) => (b.id === book.id ? { ...b, cover_id: coverId, cover_looked: true } : b)))
   }, [])
+
+  // On the All books tab, fetch any covers we haven't looked up yet (three at a time), so the grid fills in.
+  useEffect(() => {
+    if (view !== 'all' || !books) return
+    const queue = books.filter((b) => b.cover_looked === false && !coverTried.current.has(b.id))
+    if (!queue.length) return
+    let stopped = false
+    const worker = async () => { while (queue.length && !stopped) await findBookCover(queue.shift()) }
+    worker(); worker(); worker()
+    return () => { stopped = true }
+  }, [view, books, findBookCover])
 
   const actions = {
     findCover: findBookCover,
@@ -506,15 +517,21 @@ export default function Library({ group, groups, profile, notice, clearNotice, o
               q ? <Empty title={`No one has “${query.trim()}”`}>Check the spelling, or try the author's name.</Empty>
                 : <Empty title="Nothing here yet">{person ? 'Nothing in this part of their shelf yet.' : 'Try a different filter.'}</Empty>
             ) : (
-              <ul className="title-grid">
-                {visible.map((b) => (
-                  <li key={b.id}>
-                    <button type="button" className="title-tile" ref={(el) => (tileRefs.current[b.id] = el)} onClick={() => openFromList(b)}>
-                      <span className="tile-title">{b.title}</span>
-                      {b.author && <span className="tile-author">{b.author}</span>}
-                    </button>
-                  </li>
-                ))}
+              <ul className="cover-grid">
+                {visible.map((b) => {
+                  const copyId = pickCopy(b).id
+                  return (
+                    <li key={b.id}>
+                      <button
+                        type="button" className="cover-tile" title={`${b.title}${b.author ? ` by ${b.author}` : ''}`}
+                        aria-label={`${b.title}${b.author ? ` by ${b.author}` : ''}`}
+                        ref={(el) => (tileRefs.current[b.id] = el)} onClick={() => openFromList(b)}
+                      >
+                        <BookCover small title={b.title} author={b.author} coverId={b.cover_id} tone={tones[copyId] || spineTone(copyId)} />
+                      </button>
+                    </li>
+                  )
+                })}
               </ul>
             )}
           </section>

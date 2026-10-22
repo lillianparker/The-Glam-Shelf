@@ -112,18 +112,18 @@ export default BookListing
 
 // The cover: the real one from Open Library when we have it, drawn on top of our own
 // colored cover. While the picture loads, or if it can't, you see the colored one.
-export function BookCover({ title, author, tone, coverId = null }) {
+export function BookCover({ title, author, tone, coverId = null, small = false }) {
   const [status, setStatus] = useState('loading')   // 'loading' | 'shown' | 'failed'
   useEffect(() => { setStatus('loading') }, [coverId])
   const photo = coverId && status !== 'failed'
   return (
-    <div className={`cover tone-${tone}${photo && status === 'shown' ? ' has-photo' : ''}`} aria-hidden="true">
+    <div className={`cover tone-${tone}${small ? ' small' : ''}${photo && status === 'shown' ? ' has-photo' : ''}`} aria-hidden="true">
       <span>GLAM BOOKSHELF</span>
       <strong>{title}</strong>
       {author && <i>by {author}</i>}
       {photo && (
         <img
-          className="cover-photo" src={coverUrl(coverId, 'L')} alt=""
+          className="cover-photo" src={coverUrl(coverId, small ? 'M' : 'L')} alt="" loading="lazy"
           onLoad={(e) => setStatus(e.currentTarget.naturalWidth > 1 ? 'shown' : 'failed')}
           onError={() => setStatus('failed')}
         />
