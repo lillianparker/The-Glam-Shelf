@@ -5,6 +5,7 @@ import Bookcase from './Bookcase.jsx'
 import BookListing from './BookListing.jsx'
 import BookModal from './BookModal.jsx'
 import Play from './Play.jsx'
+import Activity from './Activity.jsx'
 import LibraryCard from './LibraryCard.jsx'
 import AvatarPicker, { AvatarBadge } from './AvatarPicker.jsx'
 import { bookcaseTones, compareTitles, scoreMembers, shelfCopies } from './shelf.js'
@@ -82,7 +83,7 @@ export default function Library({ group, groups, profile, notice, clearNotice, o
         .select(
           'id, title, author, ' +
           'copies(id, owner_id, status, lendable, lent_to_user, lent_to_name, lent_at, created_at, item_id, everywhere, queue(user_id, sort_key, joined_at), loans(id, borrower_id, borrower_name, lent_at, returned_at)), ' +
-          'reading(user_id, status, rating)'
+          'reading(user_id, status, rating, updated_at)'
         )
         .eq('group_id', group.id),
       loadMembers(group.id),
@@ -330,6 +331,7 @@ export default function Library({ group, groups, profile, notice, clearNotice, o
     ['bookcase', 'Bookcase', view === 'home' && !expandedOwner, () => go('home')],
     ['mine', 'My shelf', view === 'home' && expandedOwner === me, () => go('home', { expand: me })],
     ['all', 'All books', view === 'all', () => go('all')],
+    ['activity', 'Activity', view === 'activity', () => go('activity')],
     ['play', 'Play', view === 'play', () => go('play')],
   ]
 
@@ -428,6 +430,8 @@ export default function Library({ group, groups, profile, notice, clearNotice, o
             <LibraryCard name={profile.display_name} avatar={profile.avatar} libraryName={group.name} joinedAt={myMember?.joinedAt} score={scores[me]} cardNo={cardNumber(board, me)} />
           </div>
         </main>
+      ) : view === 'activity' ? (
+        <Activity books={books} me={me} nameOf={nameOf} />
       ) : view === 'play' ? (
         <Play libraryName={group.name} groupId={group.id} me={me} books={books} board={gameScores === null ? null : board} onScore={recordScore} />
       ) : (
