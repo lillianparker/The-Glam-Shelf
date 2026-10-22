@@ -51,7 +51,7 @@
   --f-display: "Bodoni Moda", "Didot", "Bodoni 72", Georgia, serif;
   --f-body: "Figtree", system-ui, -apple-system, "Segoe UI", sans-serif;
   --f-mono: "DM Mono", ui-monospace, Menlo, monospace;
-  --f-hand: "Homemade Apple", "Segoe Print", "Bradley Hand", cursive;   /* notes in the margins */
+  --f-hand: "Nothing You Could Do", "Segoe Print", "Bradley Hand", cursive;   /* notes in the margins */
   --margin-paper: #f4e8d6;  /* the page edge the notes are written on */
   --pencil: #3a2a26;        /* margin-note handwriting */
   color-scheme: dark;
