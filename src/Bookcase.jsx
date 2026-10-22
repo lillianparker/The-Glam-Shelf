@@ -234,8 +234,15 @@ export function Spine({ copy, book, me, nameOf, ownerName, selected, onOpen, ton
       onClick={() => onOpen(copy.id)}
     >
       <span className="spine-title"><span>{book.title}</span></span>
-      {book.author && <small className="spine-author"><span>{book.author.split(' ').slice(-1)[0]}</span></small>}
+      {book.author && <SpineAuthor name={book.author} />}
       {ribbon && <i className="spine-ribbon" aria-hidden="true" />}
     </button>
   )
+}
+
+// The author's last name at the foot of a spine, in ordinary horizontal type.
+// Long names get slightly smaller type so they still fit on one line (--chars sets the size in styles.css).
+function SpineAuthor({ name }) {
+  const last = name.trim().split(/\s+/).slice(-1)[0]
+  return <small className="spine-author" style={{ '--chars': last.length }}><span>{last}</span></small>
 }

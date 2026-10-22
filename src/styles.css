@@ -496,33 +496,34 @@ svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width:
   content: ""; position: absolute; left: 0; right: 0; top: 7px; height: 3px;
   border-block: 1px solid color-mix(in srgb, currentColor 35%, transparent); pointer-events: none;
 }
-/* Spine text: ordinary text turned a quarter-turn to read bottom-to-top, like a real spine.
+/* Spine text, like a real spine: the title turned a quarter-turn so it reads top-to-bottom,
+   and the author's last name in small ordinary (horizontal) type at the foot of the spine.
    (Rotating normal text behaves the same in every browser, including iPhone Safari.) */
 .spine {
   --inner-len: calc(var(--h, 0.9) * var(--spine-max) - 3px);  /* inside the border */
   --inner-wid: calc(var(--spine-w) - 3px);
-  --title-len: calc(var(--inner-len) * 0.70 - 12px);
-  --author-len: calc(var(--inner-len) * 0.28 - 8px);
+  --author-room: 16px;                                          /* space kept at the bottom for the author */
+  --title-len: calc(var(--inner-len) - 12px - var(--author-room) - 6px);
 }
-.spine.no-author { --title-len: calc(var(--inner-len) - 20px); }
-.spine-title, .spine-author {
-  position: absolute; left: 50%;
+.spine.no-author { --title-len: calc(var(--inner-len) - 24px); }
+.spine-title {
+  position: absolute; left: 50%; top: calc(12px + var(--title-len) / 2);
+  width: var(--title-len); height: calc(var(--inner-wid) - 8px);
   display: flex; align-items: center; justify-content: center; text-align: center;
   transform: translate(-50%, -50%) rotate(90deg);
   pointer-events: none;
-}
-.spine-title {
-  top: calc(12px + var(--title-len) / 2);
-  width: var(--title-len); height: calc(var(--inner-wid) - 8px);
 }
 .spine-title > span { /* up to two lines, then "…" */
   font: 500 14px/1.08 var(--f-display); overflow-wrap: anywhere;
   display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden;
 }
 .spine-author {
-  top: calc(var(--inner-len) * 0.72 + var(--author-len) / 2);
-  width: var(--author-len); height: 12px;
-  font: 600 8px var(--f-body); letter-spacing: 0.08em; text-transform: uppercase: clamp(4.5px, ..., 8px);
+  position: absolute; left: 2px; right: 2px; bottom: 8px;
+  display: flex; justify-content: center; text-align: center;
+  /* 8px type, or smaller for a long name so it fits across the spine on one line (never below 4.5px) */
+  font: 600 clamp(4.5px, calc((var(--spine-w) - 8px) / (var(--chars, 6) * 0.8)), 8px)/1 var(--f-body);
+  letter-spacing: 0.03em; text-transform: uppercase;
+  pointer-events: none;
 }
 .spine-author > span { display: block; max-width: 100%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .spine:hover, .spine.selected { transform: translateY(-9px); }
