@@ -56,7 +56,7 @@ const BookListing = forwardRef(function BookListing(
         </span>
       </header>
 
-      <div className="card-body">
+      <div className="index-body">
         <div className="card-cover">
           <BookCover title={book.title} author={book.author} coverId={book.cover_id} tone={shownTone} />
           <i className="tape" aria-hidden="true" />

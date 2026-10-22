@@ -2,12 +2,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { supabase, friendlyError } from './supabase.js'
 import Wordmark from './Wordmark.jsx'
 import Bookcase from './Bookcase.jsx'
-import BookListing, { BookCover } from './BookListing.jsx'
+import { BookCover } from './BookListing.jsx'
 import BookModal from './BookModal.jsx'
 import Play from './Play.jsx'
 import LibraryCard from './LibraryCard.jsx'
 import AvatarPicker, { AvatarBadge } from './AvatarPicker.jsx'
-import { bookcaseTones, compareTitles, scoreMembers, shelfCopies, spineTone } from './shelf.js'
+import { bookcaseTones, compareTitles, scoreMembers, spineTone } from './shelf.js'
 import { cardNumber, rankBoard, withRound } from './leaderboard.js'
 import { findCover } from './covers.js'
 import { AddBook, Empty, ScoreLine, joinNames } from './parts.jsx'
@@ -72,7 +72,6 @@ export default function Library({ group, groups, profile, notice, clearNotice, o
   const [loadError, setLoadError] = useState('')
   const [view, setView] = useState('home')          // 'home' (bookcase) | 'all' (list)
   const [expandedOwner, setExpandedOwner] = useState(null) // whose complete shelf is open on the bookcase
-  const [selectedCopyId, setSelectedCopyId] = useState(null)
   const [addOpen, setAddOpen] = useState(false)
   const [avatarOpen, setAvatarOpen] = useState(false)
   const [savingAvatar, setSavingAvatar] = useState(false)
@@ -82,7 +81,6 @@ export default function Library({ group, groups, profile, notice, clearNotice, o
   const [personTab, setPersonTab] = useState('owns')
   const [toast, setToast] = useState('')
   const toastTimer = useRef()
-  const listingHeadingRef = useRef(null)
   const [modalCopyId, setModalCopyId] = useState(null)   // book open from the All books list
   const [modalWhy, setModalWhy] = useState(null)        // 'added' when it popped up after adding a book
   const tileRefs = useRef({})
@@ -310,9 +308,6 @@ export default function Library({ group, groups, profile, notice, clearNotice, o
     for (const b of all) for (const c of b.copies) if (c.id === id) return { copy: c, book: b }
     return null
   }
-  // Default to the first book on your shelf (or anyone's) until a spine is picked.
-  const defaultEntry = shelfCopies(all, me)[0] || members.map((m) => shelfCopies(all, m.id)[0]).find(Boolean) || null
-  const entry = findEntry(selectedCopyId) || defaultEntry
 
   // Which copy to open from a title in the list: theirs if you're looking at someone's
   // shelf, else yours, else one that's free to borrow, else the first.
@@ -340,14 +335,10 @@ export default function Library({ group, groups, profile, notice, clearNotice, o
   }, [])
   const modalEntry = findEntry(modalCopyId)
 
+  // A spine on the bookcase opens its book in the same pop-up as All books
+  // (closing it puts you back on that spine).
   function openCopy(id) {
-    setSelectedCopyId(id)
-    requestAnimationFrame(() => {
-      const h = listingHeadingRef.current
-      if (!h) return
-      h.focus({ preventScroll: true })
-      h.closest('.listing')?.scrollIntoView?.({ behavior: prefersReducedMotion() ? 'auto' : 'smooth', block: 'start' })
-    })
+    openModal(id, null, document.activeElement)
   }
 
   function go(next, opts = {}) {
@@ -439,7 +430,7 @@ export default function Library({ group, groups, profile, notice, clearNotice, o
             myAvatar={profile.avatar}
             onChooseAvatar={() => { setAvatarOpen(true); window.scrollTo?.({ top: 0, behavior: prefersReducedMotion() ? 'auto' : 'smooth' }) }}
             nameOf={nameOf}
-            selectedCopyId={entry?.copy.id}
+            selectedCopyId={modalCopyId}
             expandedOwner={expandedOwner}
             onOpenCopy={openCopy}
             onExpand={setExpandedOwner}
@@ -452,21 +443,7 @@ export default function Library({ group, groups, profile, notice, clearNotice, o
             onRetry={load}
           />
 
-          <div className={`content-grid${entry ? '' : ' card-only'}`}>
-            {entry && (
-              <BookListing
-                key={entry?.copy.id || 'none'}
-                ref={listingHeadingRef}
-                entry={entry}
-                tone={tones[entry?.copy.id]}
-                me={me}
-                myName={profile.display_name}
-                members={members}
-                nameOf={nameOf}
-                actions={actions}
-                showToast={showToast}
-              />
-            )}
+          <div className="content-grid card-only">
             <LibraryCard name={profile.display_name} avatar={profile.avatar} libraryName={group.name} joinedAt={myMember?.joinedAt} score={scores[me]} cardNo={cardNumber(board, me)} />
           </div>
         </main>

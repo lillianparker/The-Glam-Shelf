@@ -564,7 +564,7 @@ svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width:
 
 /* ---------- listing + library card ---------- */
 .content-grid { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(270px, 0.7fr); gap: 24px; align-items: start; }
-.content-grid.card-only > .library-card { grid-column: 2; } /* no book picked yet: the card keeps its place on the right */
+.content-grid.card-only { grid-template-columns: minmax(0, 440px); justify-content: end; }   /* books open in a pop-up; the library card sits on its own */
 .listing {
   background: var(--surface); border: 1px solid var(--line); border-radius: 22px; padding: 30px;
   display: grid; grid-template-columns: 210px minmax(0, 1fr); gap: 32px; scroll-margin-top: 16px;
@@ -686,7 +686,7 @@ svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width:
   .topbar { grid-template-columns: 1fr auto; }
   .topbar nav { grid-column: 1 / -1; grid-row: 2; gap: 22px; overflow-x: auto; padding-bottom: 4px; }
   .content-grid { grid-template-columns: 1fr; }
-  .content-grid.card-only > .library-card { grid-column: auto; }
+  .content-grid.card-only { justify-content: center; }
   .library-card { max-width: 440px; transform: none; }
 }
 @media (max-width: 620px) {
@@ -883,7 +883,7 @@ svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width:
 }
 .index-card.editing .card-toggle { color: var(--card-link); }
 
-.card-body {
+.index-body {
   display: grid; grid-template-columns: 184px minmax(0, 1fr); gap: 0 28px;
   padding: 0 26px var(--rule) 26px; min-height: calc(var(--rule) * 8);
   /* the blue rules, 9px under each line's middle so writing sits on them */
@@ -971,7 +971,7 @@ button.tab:focus-visible, .card-link:focus-visible, .swatch:focus-visible, .card
   .index-card { --rule: 36px; }
   .card-head { padding: 14px 18px 8px; }
   .card-title { font-size: 22px; }
-  .card-body { grid-template-columns: 1fr; padding: 0 18px var(--rule); }
+  .index-body { grid-template-columns: 1fr; padding: 0 18px var(--rule); }
   /* the cover takes exactly six rules, so the writing under it still lands on the lines */
   .card-cover { margin-top: 0; height: calc(var(--rule) * 6); padding-top: 14px; box-sizing: border-box; }
   .card-cover .cover { width: 132px; padding: 14px 11px; }
