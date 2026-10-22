@@ -661,7 +661,7 @@ svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width:
 }
 .lc-head { text-align: center; padding: 26px 22px 6px; }
 .lc-library {
-  margin: 0; font: 500 clamp(26px, 3vw, 36px)/1.05 var(--f-display); letter-spacing: 0.05em; text-transform: uppercase;
+  margin: 0; font: 500 clamp(26px, 3vw, 36px)/1.05 var(--f-spine); letter-spacing: 0.07em; text-transform: uppercase;
   color: var(--accent); overflow-wrap: anywhere;
 }
 .lc-since { margin: 8px 0 0; font: 500 12.5px var(--f-display); letter-spacing: 0.04em; color: var(--ink); }
@@ -672,7 +672,7 @@ svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width:
 }
 .lc-member .avatar-badge.lg.none { background: #fff; color: var(--accent); }
 .lc-who { min-width: 0; }
-.lc-who h2 { margin: 0; font: 700 32px/1.05 var(--f-display); overflow-wrap: anywhere; }
+.lc-who h2 { margin: 0; font: 700 32px/1.05 var(--f-spine); overflow-wrap: anywhere; }
 .lc-stats { margin: 6px 0 0; font-size: 17px; color: var(--ink); }
 .lc-stats b { font-weight: 700; }
 .lc-foot {
