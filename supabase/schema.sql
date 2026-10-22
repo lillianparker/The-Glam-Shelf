@@ -886,3 +886,12 @@ grant execute on function public.record_score(uuid, int) to authenticated;
 
 -- Live updates: the board changes as friends play.
 alter publication supabase_realtime add table public.game_scores;
+
+-------------------------------------------------------------------------------
+-- Book covers (update 9)
+-------------------------------------------------------------------------------
+
+alter table public.books add column if not exists cover_id bigint;
+alter table public.books add column if not exists cover_looked boolean not null default false;
+
+-- (Members can already update books, which is how the cover gets saved. Nothing else to change.)
