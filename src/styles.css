@@ -653,33 +653,36 @@ svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width:
 .log-icon svg { width: 15px; height: 15px; }
 
 .library-card {
-  /* a light paper card on a dark desk: its own text colours */
-  --ink: #2a1a20; --muted: #6a5059; --accent: #a3194f; --accent-soft: #f8dbe5; --surface: #fff7f9; --line: #e7c9d3; --sp-pink: #f6c1d4;
-  color: var(--ink);
-  background: var(--card-pink); border: 1.5px solid var(--outline); border-radius: 17px; overflow: hidden;
-  transform: rotate(1deg); box-shadow: 0 20px 36px -8px var(--soft-shadow), 0 3px 8px rgba(8, 4, 4, 0.35);
+  /* a dusty-rose card on a dark desk: its own text colours */
+  --ink: #2a1a20; --muted: #6a5059; --accent: #a3194f; --accent-soft: #f8dbe5; --surface: #fff7f9; --line: #e7c9d3;
+  --lc-rose: #e2bfc1; --lc-band: #e9cdce;
+  color: var(--ink); background: var(--lc-rose); border-radius: 14px; overflow: hidden;
+  box-shadow: 0 18px 34px -10px var(--soft-shadow), 0 3px 8px rgba(8, 4, 4, 0.3);
 }
-.card-top { background: var(--wine); color: #fff; padding: 18px 22px; display: flex; justify-content: space-between; align-items: center; gap: 12px; }
-.card-mark {
-  width: 58px; height: 58px; border-radius: 50%; border: 1px solid var(--sp-pink); flex-shrink: 0;
-  display: grid; place-items: center; font: italic 600 16px var(--f-display); color: var(--sp-pink);
+.lc-head { text-align: center; padding: 26px 22px 6px; }
+.lc-library {
+  margin: 0; font: 500 clamp(26px, 3vw, 36px)/1.05 var(--f-display); letter-spacing: 0.05em; text-transform: uppercase;
+  color: var(--accent); overflow-wrap: anywhere;
 }
-.card-top p { margin: 0; text-align: right; font-size: 9px; line-height: 1.5; letter-spacing: 0.08em; text-transform: uppercase; min-width: 0; overflow-wrap: anywhere; }
-.card-top p strong { font-size: 11px; }
-.card-no { font-family: var(--f-mono); letter-spacing: 0.04em; white-space: nowrap; }
-.card-body {
-  padding: 24px 24px 18px;
-  background-image: repeating-linear-gradient(0deg, transparent, transparent 27px, color-mix(in srgb, var(--ink) 9%, transparent) 28px);
+.lc-since { margin: 8px 0 0; font: 500 12.5px var(--f-display); letter-spacing: 0.04em; color: var(--ink); }
+.lc-member { display: flex; align-items: center; gap: 18px; padding: 20px 28px 24px; }
+.lc-member .avatar-badge.lg {
+  width: 76px; height: 76px; font-size: 26px; flex-shrink: 0;
+  background: #fff; border: 0; box-shadow: 0 6px 14px -4px rgba(60, 20, 30, 0.35);
 }
-.card-body h2 { font: 600 28px/1.1 var(--f-display); margin: 0; overflow-wrap: anywhere; }
-.points { display: flex; align-items: center; gap: 14px; margin: 20px 0 14px; }
-.points strong { font: 600 62px/0.8 var(--f-display); color: var(--accent); font-variant-numeric: tabular-nums; }
-.points span { font: 700 9px var(--f-body); letter-spacing: 0.12em; text-transform: uppercase; }
-.point-breakdown { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; font-size: 12.5px; }
-.point-breakdown span { color: var(--muted); }
-.card-footer { border-top: 1.5px solid var(--outline); padding: 14px 22px; display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; }
-.card-footer > span { font-size: 8.5px; letter-spacing: 0.12em; }
-.barcode { font-family: var(--f-mono); letter-spacing: -2px; font-weight: 700; }
+.lc-member .avatar-badge.lg.none { background: #fff; color: var(--accent); }
+.lc-who { min-width: 0; }
+.lc-who h2 { margin: 0; font: 700 32px/1.05 var(--f-display); overflow-wrap: anywhere; }
+.lc-stats { margin: 6px 0 0; font-size: 17px; color: var(--ink); }
+.lc-stats b { font-weight: 700; }
+.lc-foot {
+  display: flex; align-items: center; gap: 14px; padding: 14px 22px; background: var(--lc-band);
+  border-top: 1px solid rgba(42, 26, 32, 0.08);
+}
+.lc-no { font-size: 18px; margin-right: auto; white-space: nowrap; }
+.lc-points { font-size: 18px; white-space: nowrap; }
+.lc-points b { font-weight: 500; }
+.lc-barcode { width: 120px; height: 34px; fill: var(--ink); stroke: none; flex-shrink: 0; }
 
 /* ---------- responsive ---------- */
 @media (max-width: 900px) {
@@ -687,7 +690,7 @@ svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width:
   .topbar nav { grid-column: 1 / -1; grid-row: 2; gap: 22px; overflow-x: auto; padding-bottom: 4px; }
   .content-grid { grid-template-columns: 1fr; }
   .content-grid.card-only { justify-content: center; }
-  .library-card { max-width: 440px; transform: none; }
+  .library-card { max-width: 440px; }
 }
 @media (max-width: 620px) {
   :root { --spine-w: 42px; --spine-gap: 5px; --more-w: 40px; --deco-w: 66px; --spine-max: 150px; }
@@ -1109,7 +1112,6 @@ kbd {
   .avatar-picker button:hover { transform: none; }
   .spine { transition: none; }
   .spine:hover, .spine.selected { transform: none; }
-  .library-card { transform: none; }
 }
 
 /* ---------- activity feed ---------- */
