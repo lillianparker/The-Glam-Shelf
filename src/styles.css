@@ -515,7 +515,7 @@ svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width:
   pointer-events: none;
 }
 .spine-title > span { /* up to two lines, then "…" */
-  font: 500 15px/1.05 var(--f-spine); 
+  font: 500 19px/1.05 var(--f-spine); 
   display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden;
 }
 .spine-author {
