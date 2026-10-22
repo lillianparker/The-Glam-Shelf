@@ -508,7 +508,7 @@ svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width:
 .spine-title, .spine-author {
   position: absolute; left: 50%;
   display: flex; align-items: center; justify-content: center; text-align: center;
-  transform: translate(-50%, -50%) rotate(-90deg);
+  transform: translate(-50%, -50%) rotate(90deg);
   pointer-events: none;
 }
 .spine-title {
@@ -522,7 +522,7 @@ svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width:
 .spine-author {
   top: calc(var(--inner-len) * 0.72 + var(--author-len) / 2);
   width: var(--author-len); height: 12px;
-  font: 600 8px var(--f-body); letter-spacing: 0.08em; text-transform: uppercase;
+  font: 600 8px var(--f-body); letter-spacing: 0.08em; text-transform: uppercase: clamp(4.5px, ..., 8px);
 }
 .spine-author > span { display: block; max-width: 100%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .spine:hover, .spine.selected { transform: translateY(-9px); }
