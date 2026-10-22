@@ -104,6 +104,7 @@ function Main() {
       group={group}
       groups={groups}
       profile={profile}
+      email={session.user.email}
       notice={notice}
       clearNotice={() => setNotice('')}
       onSwitchGroup={(id) => { store(GROUP_KEY, id); setGroupId(id) }}

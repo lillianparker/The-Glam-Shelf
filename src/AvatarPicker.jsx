@@ -1,6 +1,6 @@
 // Choose the object that sits on your shelf. Saved as profiles.avatar.
 import { useRef } from 'react'
-import { AVATARS, avatarSrc, findAvatar } from './avatars.js'
+import { avatarSrc, avatarsFor, findAvatar } from './avatars.js'
 
 // A small round badge with someone's avatar (or their initial if they haven't picked one).
 export function AvatarBadge({ id, name, size = 'sm' }) {
@@ -20,23 +20,25 @@ export function ShelfObject({ id }) {
 }
 
 // A grid of choices that works like radio buttons (arrow keys move between them).
-export default function AvatarPicker({ value, onChange, busy = false, label = 'Choose your shelf object' }) {
+// email: the signed-in account's, so personal avatars only show for their owner.
+export default function AvatarPicker({ value, onChange, busy = false, label = 'Choose your shelf object', email = '' }) {
   const refs = useRef([])
-  const current = Math.max(0, AVATARS.findIndex((a) => a.id === value))
+  const options = avatarsFor(email)
+  const current = Math.max(0, options.findIndex((a) => a.id === value))
 
   function onKey(e, i) {
     const cols = 4
     const moves = { ArrowRight: 1, ArrowLeft: -1, ArrowDown: cols, ArrowUp: -cols }
     if (!(e.key in moves)) return
     e.preventDefault()
-    const j = (i + moves[e.key] + AVATARS.length) % AVATARS.length
+    const j = (i + moves[e.key] + options.length) % options.length
     refs.current[j]?.focus()
-    onChange(AVATARS[j].id)
+    onChange(options[j].id)
   }
 
   return (
     <div className="avatar-picker" role="radiogroup" aria-label={label} aria-busy={busy}>
-      {AVATARS.map((a, i) => {
+      {options.map((a, i) => {
         const selected = a.id === value
         return (
           <button

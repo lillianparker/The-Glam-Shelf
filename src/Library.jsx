@@ -65,7 +65,7 @@ function prefersReducedMotion() {
   try { return window.matchMedia('(prefers-reduced-motion: reduce)').matches } catch { return false }
 }
 
-export default function Library({ group, groups, profile, notice, clearNotice, onSwitchGroup, onProfileChange, onGroupsChange }) {
+export default function Library({ group, groups, profile, email = '', notice, clearNotice, onSwitchGroup, onProfileChange, onGroupsChange }) {
   const me = profile.id
   const [books, setBooks] = useState(null)
   const [members, setMembers] = useState([])
@@ -405,7 +405,7 @@ export default function Library({ group, groups, profile, notice, clearNotice, o
             </div>
             <button type="button" className="btn small ghost" onClick={() => setAvatarOpen(false)}>Done</button>
           </div>
-          <AvatarPicker value={profile.avatar} onChange={saveAvatar} busy={savingAvatar} />
+          <AvatarPicker value={profile.avatar} onChange={saveAvatar} busy={savingAvatar} email={email} />
         </section>
       )}
 
