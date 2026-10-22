@@ -28,7 +28,7 @@ const BookListing = forwardRef(function BookListing({ entry, tone, idBase = 'lis
   const ownerName = isOwner ? myName : nameOf(copy.owner_id)
   const where = availabilityText(copy, me, nameOf)
   const tabs = [
-    ['comments', 'Reviews so far'],
+    ['comments', 'Reviews'],
     ['log', 'Library log'],
   ]
 
@@ -196,7 +196,7 @@ export function Comments({ copy, me, isOwner, nameOf, myName, showToast }) {
   return (
     <section className="margins" aria-label="The margins: notes from readers">
       <button type="button" className="margins-toggle" aria-expanded={open} aria-controls={panelId} onClick={() => toggle(!open)}>
-        <span className="margins-label">{open ? 'Hide your thoughts' : 'Add your thoughts'}</span>
+        <span className="margins-label">{open ? 'Hide margin notes' : 'Add margin notes'}</span>
         <span className="margins-count">{count}</span>
       </button>
       {open && (

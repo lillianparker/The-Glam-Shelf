@@ -97,7 +97,7 @@ export default function Activity({ books, me, nameOf, onOpen }) {
           lined.add(q.user_id)
           out.push({
             key: `line-${c.id}-${q.user_id}`, at: q.joined_at, who: q.user_id,
-            text: <>wants to read {whose(c.owner_id, q.user_id)} {title(b, c.id)}.</>,
+            text: <>{q.user_id === me ? 'want' : 'wants'} to read {whose(c.owner_id, q.user_id)} {title(b, c.id)}.</>,
           })
         }
       }
@@ -108,8 +108,8 @@ export default function Activity({ books, me, nameOf, onOpen }) {
         out.push({
           key: `want-${b.id}-${r.user_id}`, at: r.updated_at, who: r.user_id,
           text: !own && other && b.copies.length === 1
-            ? <>wants to read {whose(other.owner_id, r.user_id)} {title(b, other.id)}.</>
-            : <>wants to read {title(b, (own || b.copies[0])?.id)}.</>,
+            ? <>{r.user_id === me ? 'want' : 'wants'} to read {whose(other.owner_id, r.user_id)} {title(b, other.id)}.</>
+            : <>{r.user_id === me ? 'want' : 'wants'} to read {title(b, (own || b.copies[0])?.id)}.</>,
         })
       }
     }
