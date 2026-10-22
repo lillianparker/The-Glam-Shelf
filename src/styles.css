@@ -52,6 +52,7 @@
   --f-body: "Figtree", system-ui, -apple-system, "Segoe UI", sans-serif;
   --f-mono: "DM Mono", ui-monospace, Menlo, monospace;
   --f-hand: "Nothing You Could Do", "Segoe Print", "Bradley Hand", cursive;   /* notes in the margins */
+   --f-spine: "Grenze Gotisch", "Bodoni Moda", Georgia, serif;
   --margin-paper: #f4e8d6;  /* the page edge the notes are written on */
   --pencil: #3a2a26;        /* margin-note handwriting */
   color-scheme: dark;
@@ -514,7 +515,7 @@ svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width:
   pointer-events: none;
 }
 .spine-title > span { /* up to two lines, then "…" */
-  font: 500 14px/1.08 var(--f-display); overflow-wrap: anywhere;
+  font: 500 15px/1.05 var(--f-spine); 
   display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden;
 }
 .spine-author {
