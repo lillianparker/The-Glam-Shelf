@@ -956,6 +956,14 @@ button.tab:focus-visible, .card-link:focus-visible, .swatch:focus-visible, .card
 .mood[aria-pressed="true"] { border-color: var(--mood-ink); }
 .mood.shown { cursor: default; }   /* on the front of the card: just to read */
 .mood-count { font-weight: 400; opacity: 0.8; }
+.mood:focus-visible { outline-color: var(--card-link, var(--accent)); }
+
+/* All books: "In the mood for…" */
+.mood-filter { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.mood-filter-label { font: italic 500 18px var(--f-display); margin-right: 4px; }
+.mood-filter .mood { margin-top: 0; vertical-align: middle; opacity: 0.88; }
+.mood-filter .mood[aria-pressed="true"] { opacity: 1; box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--ink); }
+.mood-filter .mood:hover { opacity: 1; }
 .mood:disabled { opacity: 0.45; cursor: not-allowed; }
 .mood:focus-visible { outline: 2px solid var(--card-link); outline-offset: 2px; }
 .card-hint { font-size: 13px; vertical-align: top; }   /* smaller text, same line height: keeps the rules even */

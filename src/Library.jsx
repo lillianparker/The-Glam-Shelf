@@ -11,6 +11,7 @@ import AvatarPicker, { AvatarBadge } from './AvatarPicker.jsx'
 import { bookcaseTones, compareTitles, scoreMembers, spineTone } from './shelf.js'
 import { cardNumber, rankBoard, withRound } from './leaderboard.js'
 import { findCover } from './covers.js'
+import { MOODS } from './moods.js'
 import { AddBook, Empty, ScoreLine, joinNames } from './parts.jsx'
 
 export { POINTS } from './shelf.js'
@@ -80,6 +81,7 @@ export default function Library({ group, groups, profile, email = '', notice, cl
   const [savingAvatar, setSavingAvatar] = useState(false)
   const [query, setQuery] = useState('')
   const [filter, setFilter] = useState('all')
+  const [mood, setMood] = useState(null)          // All books: "In the mood for…" (moods, update-12)
   const [person, setPerson] = useState(null)       // whose shelf we're looking at in the list
   const [personTab, setPersonTab] = useState('owns')
   const [toast, setToast] = useState('')
@@ -299,8 +301,13 @@ export default function Library({ group, groups, profile, email = '', notice, cl
     has: (b) => b.copies.some((c) => c.lent_to_user === person),
   }
   const personCounts = person ? Object.fromEntries(Object.keys(personTests).map((k) => [k, all.filter(personTests[k]).length])) : {}
+  // How many books friends have tagged with each mood (only moods someone has used are offered).
+  const hasMood = (b, id) => (b.book_moods || []).some((m) => m.mood === id)
+  const moodsOn = all.some((b) => Array.isArray(b.book_moods))
+  const moodCounts = MOODS.map((m) => ({ ...m, count: all.filter((b) => hasMood(b, m.id)).length })).filter((m) => m.count > 0)
   const visible = all
     .filter(person ? personTests[personTab] : tests[filter])
+    .filter((b) => !mood || hasMood(b, mood))
     .filter((b) => !q || `${b.title} ${b.author}`.toLowerCase().includes(q))
   const scores = useMemo(() => scoreMembers(books || [], members), [books, members])
   const board = useMemo(() => rankBoard(gameScores || [], members), [gameScores, members])
@@ -510,6 +517,19 @@ export default function Library({ group, groups, profile, email = '', notice, cl
             </div>
           )}
 
+          {moodsOn && moodCounts.length > 0 && (
+            <div className="mood-filter" role="group" aria-label="In the mood for">
+              <span className="mood-filter-label">In the mood for</span>
+              {moodCounts.map((m) => (
+                <button key={m.id} type="button" className={`mood mood-${m.tint}`} aria-pressed={mood === m.id}
+                  onClick={() => setMood(mood === m.id ? null : m.id)}>
+                  {m.label}<span className="mood-count"> · {m.count}</span>
+                </button>
+              ))}
+              {mood && <button type="button" className="linkish small" onClick={() => setMood(null)}>show all</button>}
+            </div>
+          )}
+
           <AddBook onAdd={actions.addCopy} />
 
           <section className="list" aria-live="polite">
@@ -521,6 +541,7 @@ export default function Library({ group, groups, profile, email = '', notice, cl
               <Empty title="The shelf is empty">Add the first book you own with “+ Add a book you own” above, then send friends the invite link.</Empty>
             ) : visible.length === 0 ? (
               q ? <Empty title={`No one has “${query.trim()}”`}>Check the spelling, or try the author's name.</Empty>
+                : mood ? <Empty title={`Nothing “${MOODS.find((m) => m.id === mood)?.label}” here`}>Try another mood, or a different filter above.</Empty>
                 : <Empty title="Nothing here yet">{person ? 'Nothing in this part of their shelf yet.' : 'Try a different filter.'}</Empty>
             ) : (
               <ul className="cover-grid">
