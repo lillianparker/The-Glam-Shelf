@@ -954,6 +954,8 @@ button.tab:focus-visible, .card-link:focus-visible, .swatch:focus-visible, .card
   font: 600 13.5px var(--f-body); background: var(--mood-bg); color: var(--mood-ink);
 }
 .mood[aria-pressed="true"] { border-color: var(--mood-ink); }
+.mood.shown { cursor: default; }   /* on the front of the card: just to read */
+.mood-count { font-weight: 400; opacity: 0.8; }
 .mood:disabled { opacity: 0.45; cursor: not-allowed; }
 .mood:focus-visible { outline: 2px solid var(--card-link); outline-offset: 2px; }
 .card-hint { font-size: 13px; vertical-align: top; }   /* smaller text, same line height: keeps the rules even */

@@ -8,7 +8,7 @@ import { supabase, friendlyError } from './supabase.js'
 import { CopyRow, fmtDate, isStarred } from './parts.jsx'
 import { SPINE_TONES, libraryLog, possessive, spineTone } from './shelf.js'
 import { coverUrl } from './covers.js'
-import { MAX_MOODS, MOODS, myMoods } from './moods.js'
+import { MAX_MOODS, MOODS, myMoods, topMoods } from './moods.js'
 
 // Your side of the card. (The values match the database: reading.status and reading.rating.)
 const MY_STATUSES = [['want', 'want to read'], ['reading', 'am reading'], ['read', 'read'], ['dnf', 'DNF’d']]
@@ -100,6 +100,8 @@ function FrontSide({ book, copy, me, myName, isOwner, nameOf, actions, margins, 
         <p className="card-line" key={i}>{segs.map((s, j) => <Seg key={j} s={s} />)}</p>
       )) : <p className="card-line card-quiet">Nobody’s marked this one yet.</p>}
 
+      <MoodsLine book={book} me={me} nameOf={nameOf} />
+
       <CopyLine copy={copy} me={me} isOwner={isOwner} nameOf={nameOf} actions={actions} />
 
       <p className="card-line">
@@ -168,6 +170,28 @@ export function summarize(reading, me, nameOf) {
     lines.push([t(names(want)), tab(third ? 'wants to read' : 'want to read'), t('it')])
   }
   return lines
+}
+
+// "Feels like [still thinking about it · 3] [ugly-cried]": the top moods friends picked.
+function MoodsLine({ book, me, nameOf }) {
+  const top = topMoods(book)
+  if (!top.length) return null
+  const who = (ids) => {
+    const ns = [...ids].sort((a, b) => (a === me) - (b === me)).map((id) => (id === me ? 'you' : nameOf(id)))
+    return ns.length <= 2 ? ns.join(' & ') : `${ns.slice(0, -1).join(', ')} & ${ns[ns.length - 1]}`
+  }
+  return (
+    <p className="card-line">
+      Feels like{' '}
+      {top.map((m) => (
+        <span key={m.id}>
+          <span className={`mood mood-${m.tint} shown`} title={`${who(m.users)} picked this`}>
+            {m.label}{m.count > 1 && <span className="mood-count"> · {m.count}</span>}
+          </span>{' '}
+        </span>
+      ))}
+    </p>
+  )
 }
 
 // "Ted’s copy is [with Fred since Oct 12]" plus what you can do about it.
