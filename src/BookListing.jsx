@@ -8,6 +8,7 @@ import { supabase, friendlyError } from './supabase.js'
 import { CopyRow, fmtDate, isStarred } from './parts.jsx'
 import { SPINE_TONES, libraryLog, possessive, spineTone } from './shelf.js'
 import { coverUrl } from './covers.js'
+import { MAX_MOODS, MOODS, myMoods } from './moods.js'
 
 // Your side of the card. (The values match the database: reading.status and reading.rating.)
 const MY_STATUSES = [['want', 'want to read'], ['reading', 'am reading'], ['read', 'read'], ['dnf', 'DNF’d']]
@@ -269,6 +270,11 @@ function MySide({ book, copy, me, isOwner, tone, members, nameOf, actions, margi
         ))}
       </p>
 
+      {/* moods need update-12.sql: until then books arrive without book_moods and there's no picker */}
+      {status === 'read' && Array.isArray(book.book_moods) && actions.setMood && (
+        <MoodPicker book={book} me={me} actions={actions} />
+      )}
+
       {isOwner && (
         <p className="card-line">
           <mark className="tab plain">Spine color?</mark>{' '}
@@ -307,6 +313,29 @@ function MySide({ book, copy, me, isOwner, tone, members, nameOf, actions, margi
         </div>
       )}
     </>
+  )
+}
+
+// "It felt like (up to 3)": your moods for a book you've read.
+function MoodPicker({ book, me, actions }) {
+  const mine = myMoods(book, me)
+  const full = mine.length >= MAX_MOODS
+  return (
+    <p className="card-line" role="group" aria-label={`Moods, up to ${MAX_MOODS}`}>
+      It felt like <span className="card-quiet card-hint">(up to {MAX_MOODS})</span>{' '}
+      {MOODS.map((m) => {
+        const on = mine.includes(m.id)
+        return (
+          <span key={m.id}>
+            <button type="button" className={`mood mood-${m.tint}`} aria-pressed={on}
+              disabled={!on && full} title={!on && full ? `You’ve picked ${MAX_MOODS}. Tap one to swap it out.` : undefined}
+              onClick={() => actions.setMood(book, m.id, !on)}>
+              {on && <span aria-hidden="true">✓ </span>}{m.label}
+            </button>{' '}
+          </span>
+        )
+      })}
+    </p>
   )
 }
 

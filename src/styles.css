@@ -946,6 +946,29 @@ button.tab:focus-visible, .card-link:focus-visible, .swatch:focus-visible, .card
 .swatch[aria-pressed="true"] { box-shadow: 0 0 0 2px var(--card-paper), 0 0 0 4px var(--card-ink); }
 .swatch[aria-expanded] { border: 1.5px solid var(--card-ink); }
 
+/* moods (update-12): small pills in a light wash of a spine color, dark text for contrast */
+.mood {
+  display: inline-block; box-sizing: border-box; height: 27px; line-height: 24px !important; padding: 0 11px;
+  vertical-align: top; margin-top: 5px;   /* sits inside its line, so the card's rules stay even */
+  border-radius: 13px; border: 1.5px solid transparent; cursor: pointer; white-space: nowrap;
+  font: 600 13.5px var(--f-body); background: var(--mood-bg); color: var(--mood-ink);
+}
+.mood[aria-pressed="true"] { border-color: var(--mood-ink); }
+.mood:disabled { opacity: 0.45; cursor: not-allowed; }
+.mood:focus-visible { outline: 2px solid var(--card-link); outline-offset: 2px; }
+.card-hint { font-size: 13px; vertical-align: top; }   /* smaller text, same line height: keeps the rules even */
+.mood-plum      { --mood-bg: #ecdfe8; --mood-ink: #5e3d55; }
+.mood-wine      { --mood-bg: #f1dbe1; --mood-ink: #6d2941; }
+.mood-gold      { --mood-bg: #f2e6c4; --mood-ink: #6b5214; }
+.mood-sun       { --mood-bg: #f6ead0; --mood-ink: #7a5418; }
+.mood-cocoa     { --mood-bg: #efe2d6; --mood-ink: #5b3d2a; }
+.mood-pink      { --mood-bg: #f8dbe6; --mood-ink: #8a1f48; }
+.mood-sage      { --mood-bg: #e3ecdd; --mood-ink: #3d5a36; }
+.mood-aubergine { --mood-bg: #e6dff0; --mood-ink: #4b3460; }
+.mood-forest    { --mood-bg: #dde9e0; --mood-ink: #2c4a35; }
+.mood-navy      { --mood-bg: #dbe3ec; --mood-ink: #2f4a66; }
+.mood-blue      { --mood-bg: #e0eaf0; --mood-ink: #33566b; }
+
 /* the owner's tools, kept on the card's rules */
 .card-owner .copy, .card-owner .copy-main, .card-owner .ctrl, .card-owner .owner-tools,
 .card-owner .line, .card-owner .give-form, .card-owner .edit-form, .card-owner .edit-actions, .card-owner .inline {

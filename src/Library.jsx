@@ -32,25 +32,27 @@ const HOMEPAGE_TEXT = 'Search for books, upload ones you own, and borrow from fr
 // Members with their names and avatars. If the avatar column doesn't exist yet
 // (update-5.sql not run), load without it so nothing else breaks.
 // Books with their copies, line, loans and reading. Newer columns (covers: update-9.sql,
-// spine color: update-10.sql) are left out if the database doesn't have them yet, so nothing else breaks.
-function booksQuery({ covers, tone }) {
+// spine color: update-10.sql, moods: update-12.sql) are left out if the database doesn't have them yet,
+// so nothing else breaks.
+function booksQuery({ covers, tone, moods }) {
   return (
     'id, title, author, ' + (covers ? 'cover_id, cover_looked, ' : '') +
     'copies(id, owner_id, status, lendable, lent_to_user, lent_to_name, lent_at, created_at, item_id, everywhere, ' + (tone ? 'tone, ' : '') +
     'queue(user_id, sort_key, joined_at), loans(id, borrower_id, borrower_name, lent_at, returned_at)), ' +
-    'reading(user_id, status, rating, updated_at)'
+    'reading(user_id, status, rating, updated_at)' + (moods ? ', book_moods(user_id, mood)' : '')
   )
 }
 async function loadBooks(groupId) {
-  const has = { covers: true, tone: true }
-  for (let tries = 0; tries < 3; tries++) {
+  const has = { covers: true, tone: true, moods: true }
+  for (let tries = 0; tries < 4; tries++) {
     const res = await supabase.from('books').select(booksQuery(has)).eq('group_id', groupId)
     const msg = res.error?.message || ''
+    if (res.error && has.moods && /book_moods/i.test(msg)) { has.moods = false; continue }
     if (res.error && has.tone && /tone/i.test(msg)) { has.tone = false; continue }
     if (res.error && has.covers && /cover/i.test(msg)) { has.covers = false; continue }
     return res
   }
-  return supabase.from('books').select(booksQuery({ covers: false, tone: false })).eq('group_id', groupId)
+  return supabase.from('books').select(booksQuery({ covers: false, tone: false, moods: false })).eq('group_id', groupId)
 }
 
 async function loadMembers(groupId) {
@@ -139,6 +141,7 @@ export default function Library({ group, groups, profile, email = '', notice, cl
       .on('postgres_changes', { event: '*', schema: 'public', table: 'group_members', filter: `group_id=eq.${group.id}` }, refresh)
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'profiles' }, refresh)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'game_scores', filter: `group_id=eq.${group.id}` }, refresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'book_moods' }, refresh)
       .subscribe()
     return () => { clearTimeout(timer); supabase.removeChannel(channel) }
   }, [group.id, load])
@@ -182,6 +185,10 @@ export default function Library({ group, groups, profile, email = '', notice, cl
 
   const actions = {
     findCover: findBookCover,
+    // tag a book you've read with a mood, or take one off (up to 3; update-12.sql)
+    setMood: (book, mood, on) => on
+      ? run(supabase.from('book_moods').insert({ user_id: me, book_id: book.id, mood }))
+      : run(supabase.from('book_moods').delete().eq('user_id', me).eq('book_id', book.id).eq('mood', mood)),
     // the owner picks their copy's spine color (null = automatic again); needs update-10.sql
     setTone: (copy, tone) => run(supabase.rpc('set_spine_tone', { cid: copy.id, new_tone: tone }), tone ? 'Spine color saved' : 'Spine color back to automatic'),
     addCopy: async (title, author, everywhere = false) => {
