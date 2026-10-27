@@ -201,9 +201,11 @@ export default function Library({ group, groups, profile, email = '', notice, cl
         if (!res.error && everywhere) showToast(`Added “${title}” here. Showing books in all libraries needs update-6.sql.`)
       }
       if (res.error) { showToast(friendlyError(res.error)); return false }
+      // one title + author is one book (update-14.sql): if you already had it here, that copy comes back
+      const already = (books || []).some((b) => b.copies.some((c) => c.id === res.data))
       await load()
-      // pop the new book up so you can mark it read / reading / want to read straight away
-      if (res.data) openModal(res.data, 'added', document.getElementById('add-title'))
+      // pop the book up so you can mark it read / reading / want to read straight away
+      if (res.data) openModal(res.data, already ? 'already' : 'added', document.getElementById('add-title'))
       return true
     },
     giveCopy: async (copy, friendId) => {
@@ -568,7 +570,7 @@ export default function Library({ group, groups, profile, email = '', notice, cl
       {modalEntry && (
         <BookModal
           entry={modalEntry}
-          intro={modalWhy === 'added' ? 'Added to your shelf. Have you read it?' : null}
+          intro={modalWhy === 'added' ? 'Added to your shelf. Have you read it?' : modalWhy === 'already' ? 'You already have this one on your shelf.' : null}
           copies={[...modalEntry.book.copies].sort((a, b) => (b.owner_id === me) - (a.owner_id === me) || a.created_at.localeCompare(b.created_at))}
           onPickCopy={setModalCopyId}
           onClose={closeModal}
@@ -576,7 +578,11 @@ export default function Library({ group, groups, profile, email = '', notice, cl
           myName={profile.display_name}
           nameOf={nameOf}
           tones={tones}
-          listingProps={{ members, actions, showToast }}
+          listingProps={{
+            members, actions, showToast,
+            // a mood on the card: close it and show every book that feels like that
+            onPickMood: (id) => { closeModal(); setPerson(null); setFilter('all'); setQuery(''); setMood(id); go('all') },
+          }}
         />
       )}
 

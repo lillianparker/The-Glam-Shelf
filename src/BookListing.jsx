@@ -17,7 +17,7 @@ const MY_VERDICTS = [['up', 'loved it'], ['good', 'liked it'], ['meh', 'it was f
 const VERDICT_SAID = { up: 'loved it', good: 'liked it', meh: 'thought it was fine', down: 'didn’t love it' }
 
 const BookListing = forwardRef(function BookListing(
-  { entry, tone, idBase = 'listing', me, myName, members, nameOf, actions, showToast, onAddBook, startEditing = false },
+  { entry, tone, idBase = 'listing', me, myName, members, nameOf, actions, showToast, onAddBook, startEditing = false, onPickMood },
   headingRef,
 ) {
   const copyId = entry?.copy.id
@@ -67,7 +67,7 @@ const BookListing = forwardRef(function BookListing(
             <MySide book={book} copy={copy} me={me} isOwner={isOwner} tone={shownTone} members={members}
               nameOf={nameOf} actions={actions} margins={margins} />
           ) : (
-            <FrontSide book={book} copy={copy} me={me} myName={myName} isOwner={isOwner} nameOf={nameOf}
+            <FrontSide book={book} copy={copy} me={me} myName={myName} isOwner={isOwner} nameOf={nameOf} onPickMood={onPickMood}
               actions={actions} margins={margins} idBase={idBase} />
           )}
         </div>
@@ -82,7 +82,7 @@ export default BookListing
 // The front: who's read it, where the copy is, the margins and the log
 // ---------------------------------------------------------------------------
 
-function FrontSide({ book, copy, me, myName, isOwner, nameOf, actions, margins, idBase }) {
+function FrontSide({ book, copy, me, myName, isOwner, nameOf, actions, margins, idBase, onPickMood }) {
   const rows = summarize(book.reading || [], me, nameOf)
   const [open, setOpen] = useState(() => { try { return localStorage.getItem('glam_margins_open') === '1' } catch { return false } })
   const toggleMargins = () => {
@@ -100,7 +100,7 @@ function FrontSide({ book, copy, me, myName, isOwner, nameOf, actions, margins, 
         <p className="card-line" key={i}>{segs.map((s, j) => <Seg key={j} s={s} />)}</p>
       )) : <p className="card-line card-quiet">Nobody’s marked this one yet.</p>}
 
-      <MoodsLine book={book} me={me} nameOf={nameOf} />
+      <MoodsLine book={book} me={me} nameOf={nameOf} onPick={onPickMood} />
 
       <CopyLine copy={copy} me={me} isOwner={isOwner} nameOf={nameOf} actions={actions} />
 
@@ -173,7 +173,8 @@ export function summarize(reading, me, nameOf) {
 }
 
 // "Feels like [still thinking about it · 3] [ugly-cried]": the top moods friends picked.
-function MoodsLine({ book, me, nameOf }) {
+// onPick: tapping a mood shows every book that feels like it (All books, filtered).
+function MoodsLine({ book, me, nameOf, onPick }) {
   const top = topMoods(book)
   if (!top.length) return null
   const who = (ids) => {
@@ -185,9 +186,17 @@ function MoodsLine({ book, me, nameOf }) {
       Feels like{' '}
       {top.map((m) => (
         <span key={m.id}>
-          <span className={`mood mood-${m.tint} shown`} title={`${who(m.users)} picked this`}>
-            {m.label}{m.count > 1 && <span className="mood-count"> · {m.count}</span>}
-          </span>{' '}
+          {onPick ? (
+            <button type="button" className={`mood mood-${m.tint}`} title={`${who(m.users)} picked this. See every book that feels like this`}
+              aria-label={`${m.label}${m.count > 1 ? `, ${m.count} friends` : ''}: see every book that feels like this`}
+              onClick={() => onPick(m.id)}>
+              {m.label}{m.count > 1 && <span className="mood-count"> · {m.count}</span>}
+            </button>
+          ) : (
+            <span className={`mood mood-${m.tint} shown`} title={`${who(m.users)} picked this`}>
+              {m.label}{m.count > 1 && <span className="mood-count"> · {m.count}</span>}
+            </span>
+          )}{' '}
         </span>
       ))}
     </p>

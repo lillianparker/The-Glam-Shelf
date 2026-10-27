@@ -955,6 +955,7 @@ button.tab:focus-visible, .card-link:focus-visible, .swatch:focus-visible, .card
 }
 .mood[aria-pressed="true"] { border-color: var(--mood-ink); }
 .mood.shown { cursor: default; }   /* on the front of the card: just to read */
+button.mood:not(:disabled):hover { box-shadow: inset 0 0 0 1.5px var(--mood-ink); }
 .mood-count { font-weight: 400; opacity: 0.8; }
 .mood:focus-visible { outline-color: var(--card-link, var(--accent)); }
 
